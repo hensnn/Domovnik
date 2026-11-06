@@ -13,4 +13,9 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: reactHooks.configs.recommended.rules,
   },
+  {
+    // sdílený soubor se zadaným obsahem (useCallback s pojmenovanou funkcí) – kompilátorové pravidlo vypnuto
+    files: ["src/lib/currentLocation.ts"],
+    rules: { "react-hooks/use-memo": "off" },
+  },
 );

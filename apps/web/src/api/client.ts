@@ -26,6 +26,11 @@ export class ApiError extends Error {
   get isConflict() {
     return this.status === 409;
   }
+
+  /** Server neodpověděl (offline, výpadek sítě) – na rozdíl od odpovědi s chybou. */
+  get isNetwork() {
+    return this.status === 0;
+  }
 }
 
 type Params = Record<string, string | number | boolean | string[] | null | undefined>;
@@ -58,13 +63,21 @@ export async function api<T>(
   if (body !== undefined) h["Content-Type"] = "application/json";
   if (csrfToken && method !== "GET") h["X-CSRF-Token"] = csrfToken;
 
-  const res = await fetch(`/api/v1${path}${buildQuery(params)}`, {
-    method,
-    headers: h,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: "same-origin",
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1${path}${buildQuery(params)}`, {
+      method,
+      headers: h,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "same-origin",
+      signal,
+    });
+  } catch (e) {
+    if (e instanceof TypeError) {
+      throw new ApiError(0, "network", "Nepodařilo se spojit se serverem. Zkontroluj připojení.");
+    }
+    throw e; // např. AbortError
+  }
 
   if (res.status === 204) return undefined as T;
   const text = await res.text();

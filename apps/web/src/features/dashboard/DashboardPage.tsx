@@ -1,8 +1,10 @@
 import {
   AlertTriangle,
+  ClipboardCheck,
   FolderTree,
   HelpCircle,
   Package,
+  ScanLine,
   ShieldAlert,
   Tags,
   Timer,
@@ -36,6 +38,21 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-3 md:p-5">
       <h1 className="text-xl font-bold">{t("dashboard.hello", { name: me.user.display_name })}</h1>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          to="/scan"
+          className="flex items-center gap-3 rounded-xl bg-brand-600 p-4 font-semibold text-white hover:bg-brand-700"
+        >
+          <ScanLine className="size-6" /> {t("scan.title")}
+        </Link>
+        <Link
+          to="/inventory"
+          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 font-semibold hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          <ClipboardCheck className="size-6 text-brand-600" /> {t("inventory.nav")}
+        </Link>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat to="/items" icon={<Package />} label={t("dashboard.items")} value={c.items} />

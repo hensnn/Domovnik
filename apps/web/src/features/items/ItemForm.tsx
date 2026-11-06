@@ -15,6 +15,7 @@ import {
   errorMessage,
   useToast,
 } from "../../components/ui";
+import { useCurrentLocation } from "../../lib/currentLocation";
 
 const STATUSES: ItemStatus[] = ["stored", "in_use", "lent", "repair", "discarded", "sold", "lost"];
 const CONDITIONS = ["", "new", "good", "worn", "broken"];
@@ -98,7 +99,10 @@ export default function ItemForm({
 }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const [f, setF] = useState<FormState>(() => initial(item, presetLocation, presetCategory));
+  const [here] = useCurrentLocation(); // „Jsem tady“ = výchozí umístění nové věci
+  const [f, setF] = useState<FormState>(() =>
+    initial(item, presetLocation ?? (item ? null : here), presetCategory),
+  );
   const [more, setMore] = useState(!!item);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));

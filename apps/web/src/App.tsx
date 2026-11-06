@@ -3,8 +3,10 @@ import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import CategoriesPage from "./features/categories/CategoriesPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
+import InventoryPage from "./features/inventory/InventoryPage";
 import ItemsPage from "./features/items/ItemsPage";
 import LocationsPage from "./features/locations/LocationsPage";
+import ScanPage from "./features/scan/ScanPage";
 import SettingsPage from "./features/settings/SettingsPage";
 
 export default function App() {
@@ -17,6 +19,9 @@ export default function App() {
         <Route path="locations" element={<LocationsPage />} />
         <Route path="locations/:id" element={<LocationsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="scan" element={<ScanPage />} />
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/:id" element={<InventoryPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Route>
