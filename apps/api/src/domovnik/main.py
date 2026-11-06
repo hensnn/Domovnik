@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from domovnik import __version__
-from domovnik.api import auth, catalog, items, system
+from domovnik.api import auth, catalog, files, items, system
 from domovnik.config import get_settings
 from domovnik.db import check_database
 from domovnik.errors import DomainError
@@ -65,5 +65,5 @@ def ready(response: Response) -> dict[str, str]:
     return {"status": "ok" if ok else "unavailable", "database": "ok" if ok else "unavailable"}
 
 
-for module in (auth, catalog, items, system):
+for module in (auth, catalog, items, files, system):
     app.include_router(module.router, prefix="/api/v1")
