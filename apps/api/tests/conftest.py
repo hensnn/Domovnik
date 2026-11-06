@@ -91,9 +91,7 @@ def ctx(db: Session, user: User) -> ActorContext:
     return c
 
 
-@pytest.fixture
-def clean_db(test_db_url: str) -> Iterator[None]:
-    """Pro API testy (commitují): před testem promaže všechna data."""
+def _truncate_all() -> None:
     with get_engine().begin() as conn:
         tables = conn.execute(
             text(
@@ -102,7 +100,14 @@ def clean_db(test_db_url: str) -> Iterator[None]:
             )
         ).scalar_one()
         conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture
+def clean_db(test_db_url: str) -> Iterator[None]:
+    """Pro API testy (commitují): před i po testu promaže všechna data."""
+    _truncate_all()
     yield
+    _truncate_all()  # data z API testů nesmí zasahovat do testů s rollbackem (db)
 
 
 __all__ = ["to_sqlalchemy_url"]

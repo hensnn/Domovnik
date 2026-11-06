@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from domovnik.context import ActorContext
 from domovnik.db.models import (
     Category,
+    FileLink,
     Item,
     ItemPlacement,
     ItemTag,
@@ -96,10 +97,20 @@ def to_out(db: Session, items: list[Item]) -> list[ItemOut]:
             )
         )
     cat_paths = _category_paths(db, {i.category_id for i in items if i.category_id})
+    file_counts: dict[uuid.UUID, int] = {
+        item_id: count
+        for item_id, count in db.execute(
+            select(FileLink.item_id, func.count())
+            .where(FileLink.item_id.in_(ids))
+            .group_by(FileLink.item_id)
+        ).tuples()
+        if item_id is not None
+    }
 
     out: list[ItemOut] = []
     for item in items:
         o = ItemOut.model_validate(item)
+        o.file_count = file_counts.get(item.id, 0)
         o.tags = tags.get(item.id, [])
         o.placements = by_item.get(item.id, [])
         o.total_quantity = sum((p.quantity for p in o.placements), Decimal(0))

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from domovnik import __version__
 from domovnik.ai.providers.base import NotConfigured, ProviderError, RateLimited
-from domovnik.api import ai, auth, catalog, items, system
+from domovnik.api import ai, auth, catalog, files, items, system
 from domovnik.config import get_settings
 from domovnik.db import check_database
 from domovnik.errors import DomainError
@@ -83,5 +83,5 @@ def ready(response: Response) -> dict[str, str]:
     return {"status": "ok" if ok else "unavailable", "database": "ok" if ok else "unavailable"}
 
 
-for module in (auth, catalog, items, system, ai):
+for module in (auth, catalog, items, files, system, ai):
     app.include_router(module.router, prefix="/api/v1")

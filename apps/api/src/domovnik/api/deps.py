@@ -101,6 +101,7 @@ read = require("items:read")
 own = read  # vlastní účet a tokeny: stačí být přihlášen
 write = require("items:write")
 ai_chat = require("ai:chat")
+files_write = require("files:write")
 admin = require("admin")
 
 
