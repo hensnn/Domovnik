@@ -6,8 +6,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // API, které se NIKDY necachuje (přihlášení, AI, proud událostí, štítky/PDF): žádné runtime pravidlo
 // je nezachytí, takže jdou vždy rovnou na síť. Zápisy (POST/PATCH/PUT/DELETE) se necachují nikdy.
-const CACHED_READS = /^\/api\/v1\/(items|locations|categories|tags|stats|settings)(\/|$)/;
-const THUMBS = /^\/api\/v1\/files\/[^/]+\/thumb$/;
+// POZOR: funkce urlPattern se serializují do service workeru – nesmí používat proměnné z tohoto souboru.
 
 // Dev: /api se proxuje na FastAPI (port 8000). V produkci to řeší reverzní proxy.
 export default defineConfig({
@@ -55,7 +54,10 @@ export default defineConfig({
           {
             // Čtení dat: nejdřív síť (vždy čerstvá data po úpravě), při výpadku uložená kopie.
             urlPattern: ({ url, request }) =>
-              request.method === "GET" && CACHED_READS.test(url.pathname),
+              request.method === "GET" &&
+              /^\/api\/v1\/(items|locations|categories|tags|stats|settings)(\/|$)/.test(
+                url.pathname,
+              ),
             handler: "NetworkFirst",
             options: {
               cacheName: "domovnik-api",
@@ -66,7 +68,8 @@ export default defineConfig({
           },
           {
             // Náhledy fotek se po nahrání nemění (adresované obsahem) → cache first.
-            urlPattern: ({ url, request }) => request.method === "GET" && THUMBS.test(url.pathname),
+            urlPattern: ({ url, request }) =>
+              request.method === "GET" && /^\/api\/v1\/files\/[^/]+\/thumb$/.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "domovnik-thumbs",

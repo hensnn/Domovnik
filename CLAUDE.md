@@ -18,6 +18,8 @@ Z kořene repa (vyžaduje `pnpm`, `uv`, Docker; `uv` na Windows bývá v `%APPDA
 - Lokální konfigurace: zkopíruj `.env.example` → `.env` (necommituje se)
 - Soubory (F4): úložiště je `FILES_DIR` (výchozí `./data/files`); `uv run domovnik files-gc --hours 24` smaže nepoužité soubory; rozhodnutí v `docs/adr/0001-uloziste-souboru.md`
 
+- Štítky a inventura (F5b): `GET /api/v1/labels/pdf` (reportlab + font DejaVu v `apps/api/src/domovnik/assets/fonts`, QR = `label_code`), `GET /api/v1/resolve?code=` pro skener, `/api/v1/inventory/sessions`. PWA: `vite-plugin-pwa` (service worker se generuje při `pnpm build`; funkce `urlPattern` ve `vite.config.ts` se serializují do SW – nesmí používat proměnné z konfigurace). Ikony PWA: `cd apps/api && uv run python ../web/scripts/make-icons.py`. Kamera vyžaduje HTTPS nebo localhost.
+
 Poznámky: TypeScript je připnutý na `~5.9`, protože `typescript-eslint` zatím nepodporuje TS 7. `just` se nepoužívá (nahrazují ho skripty v kořenovém `package.json`).
 
 ## Neměnná architektonická pravidla
