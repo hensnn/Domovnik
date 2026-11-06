@@ -114,6 +114,27 @@ DEMO_DETECTIONS: dict[str, Any] = {
 }
 
 
+DEMO_PLAN: dict[str, Any] = {
+    "summary": "Nářadí ulož pohromadě do garáže, kabely do krabice s kabely.",
+    "steps": [
+        {
+            "title": "Ulož nářadí do kufru v garáži",
+            "detail": "Akušroubovák a metr patří k sobě.",
+            "detection_ids": [],
+            "location_path": ["Dům", "Garáž", "Kufr s nářadím"],
+            "create_location": False,
+        },
+        {
+            "title": "Kabely dej do krabice Kabely",
+            "detail": "Svinuté kabely svaž páskou.",
+            "detection_ids": [],
+            "location_path": ["Dům", "Sklep", "Regál B", "Krabice Kabely"],
+            "create_location": False,
+        },
+    ],
+}
+
+
 class DemoProvider(FakeProvider):
     """Vývojový „asistent“ bez API klíče (zapíná se proměnnou DOMOVNIK_FAKE_AI=1).
 
@@ -136,6 +157,8 @@ class DemoProvider(FakeProvider):
         import json
 
         if json_schema is not None:
+            if "steps" in json_schema.get("properties", {}):
+                return text(json.dumps(DEMO_PLAN, ensure_ascii=False))
             return text(json.dumps(DEMO_DETECTIONS, ensure_ascii=False))
         last = messages[-1]
         if last.role == "tool":

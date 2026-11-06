@@ -377,3 +377,48 @@ class AiChangeOp(Base):
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     error: Mapped[str | None] = mapped_column(Text)
     result_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+
+
+class PhotoAnalysis(Base):
+    __tablename__ = "photo_analyses"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    file_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"))
+    context_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("locations.id", ondelete="SET NULL")
+    )
+    user_hint: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    prompt_version: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, server_default="queued")
+    result: Mapped[Any | None] = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(Text)
+    tokens_in: Mapped[int | None] = mapped_column(Integer)
+    tokens_out: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 5))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = _now()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PhotoDetection(Base):
+    __tablename__ = "photo_detections"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("photo_analyses.id", ondelete="CASCADE")
+    )
+    label: Mapped[str] = mapped_column(Text)
+    bbox: Mapped[Any | None] = mapped_column(JSONB)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
+    suggested: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    suggested_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("locations.id", ondelete="SET NULL")
+    )
+    suggestion_reason: Mapped[str | None] = mapped_column(Text)
+    matched_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("items.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(Text, server_default="pending")
+    item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("items.id", ondelete="SET NULL"))
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
