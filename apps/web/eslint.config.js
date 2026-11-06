@@ -13,4 +13,9 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: reactHooks.configs.recommended.rules,
   },
+  {
+    // sdílený soubor se pevným obsahem (předává se stabilní funkce modulu, ne inline callback)
+    files: ["src/lib/currentLocation.ts"],
+    rules: { "react-hooks/use-memo": "off" },
+  },
 );

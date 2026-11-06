@@ -1,19 +1,29 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { del, get, patch, post, put } from "./client";
+import { del, get, patch, post, postForm, put } from "./client";
 import type {
+  AiStatus,
   ApiToken,
   BulkResult,
   Category,
+  ChangeSet,
+  CommitResult,
+  Conversation,
   Dashboard,
+  DetectionDecision,
+  FileLink,
+  FileRole,
   Item,
   ItemFilters,
   ItemPage,
   Location,
   Movement,
+  PhotoAnalysis,
   SearchResults,
   SettingDef,
+  StoredMessage,
   Tag,
+  UploadResult,
   User,
 } from "./types";
 
@@ -71,13 +81,49 @@ export const useUsers = (enabled = true) =>
 export const useTokens = () =>
   useQuery({ queryKey: ["tokens"], queryFn: () => get<ApiToken[]>("/tokens") });
 
+export const useItemFiles = (id: string | undefined) =>
+  useQuery({
+    queryKey: ["item", id, "files"],
+    queryFn: () => get<FileLink[]>(`/items/${id}/files`),
+    enabled: !!id,
+  });
+
+export const useLocationFiles = (id: string | undefined) =>
+  useQuery({
+    queryKey: ["location-files", id],
+    queryFn: () => get<FileLink[]>(`/locations/${id}/files`),
+    enabled: !!id,
+  });
+
+export const useAiStatus = () =>
+  useQuery({
+    queryKey: ["ai", "status"],
+    queryFn: () => get<AiStatus>("/ai/status"),
+    retry: false,
+  });
+
+export const useConversations = () =>
+  useQuery({
+    queryKey: ["ai", "conversations"],
+    queryFn: () => get<Conversation[]>("/ai/conversations", { limit: 50 }),
+  });
+
 // --- Zápis --------------------------------------------------------------------------------
 
 /** Po každé změně dat zneplatní všechny cache s daty (jednoduché a spolehlivé). */
-function useInvalidateData() {
+export function useInvalidateData() {
   const qc = useQueryClient();
   return () => {
-    for (const key of ["items", "item", "locations", "categories", "tags", "stats", "search"]) {
+    for (const key of [
+      "items",
+      "item",
+      "locations",
+      "location-files",
+      "categories",
+      "tags",
+      "stats",
+      "search",
+    ]) {
       void qc.invalidateQueries({ queryKey: [key] });
     }
   };
@@ -130,4 +176,34 @@ export const api_ = {
   createToken: (body: unknown) => post<ApiToken & { token: string }>("/tokens", body),
   revokeToken: (id: string) => del<void>(`/tokens/${id}`),
   changePassword: (body: unknown) => post<void>("/auth/password", body),
+  // AI asistent
+  applyChangeSet: (id: string, skipOperationIds: string[] = []) =>
+    post<ChangeSet>(`/ai/change-sets/${id}/apply`, { skip_operation_ids: skipOperationIds }),
+  rejectChangeSet: (id: string) => post<ChangeSet>(`/ai/change-sets/${id}/reject`),
+  undoChangeSet: (id: string) => post<ChangeSet>(`/ai/change-sets/${id}/undo`),
+  deleteConversation: (id: string) => del<void>(`/ai/conversations/${id}`),
+  conversationMessages: (id: string) => get<StoredMessage[]>(`/ai/conversations/${id}/messages`),
+  // Soubory
+  uploadFile: (
+    file: File,
+    target: { item_id?: string; location_id?: string; role?: FileRole; caption?: string } = {},
+    signal?: AbortSignal,
+  ) => {
+    const form = new FormData();
+    form.append("file", file);
+    for (const [k, v] of Object.entries(target)) if (v) form.append(k, v);
+    return postForm<UploadResult>("/files", form, signal);
+  },
+  updateFileLink: (
+    id: string,
+    body: { role?: FileRole; caption?: string | null; is_primary?: boolean },
+  ) => patch<FileLink>(`/file-links/${id}`, body),
+  deleteFileLink: (id: string) => del<void>(`/file-links/${id}`),
+  // Čtení fotek AI
+  analyzePhoto: (body: { file_id: string; context_location_id?: string; hint?: string }) =>
+    post<{ id: string; status: string }>("/photos/analyze", body),
+  getAnalysis: (id: string, signal?: AbortSignal) =>
+    get<PhotoAnalysis>(`/photos/analyses/${id}`, undefined, signal),
+  commitAnalysis: (id: string, decisions: DetectionDecision[]) =>
+    post<CommitResult>(`/photos/analyses/${id}/commit`, { decisions }),
 };

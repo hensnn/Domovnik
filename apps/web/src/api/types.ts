@@ -211,3 +211,170 @@ export interface BulkResult {
   ok: number;
   failed: { id: string; error: string }[];
 }
+
+// --- AI asistent ------------------------------------------------------------------------
+
+export interface AiStatus {
+  enabled: boolean;
+  configured: boolean;
+  provider: string;
+  model: string;
+  trust_level: string;
+  requests_today: number;
+  requests_per_day_limit: number;
+}
+
+export type ChangeSetStatus =
+  "proposed" | "applied" | "partially_applied" | "rejected" | "undone" | "failed";
+
+export interface ChangeOperation {
+  id: string;
+  seq: number;
+  op: string;
+  description: string;
+  status: string;
+  error: string | null;
+}
+
+export interface ChangeSet {
+  id: string;
+  summary: string;
+  status: ChangeSetStatus;
+  auto_applied?: boolean;
+  created_at?: string | null;
+  risky: boolean;
+  needs_ui_confirmation: boolean;
+  reversible: boolean | null;
+  operations: ChangeOperation[];
+}
+
+export interface Conversation {
+  id: string;
+  title: string | null;
+  channel: string;
+  created_at: string;
+}
+
+export interface StoredMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export type ChatEvent =
+  | { type: "conversation"; conversation_id: string }
+  | { type: "tool_call"; name: string; arguments?: Record<string, unknown> }
+  | { type: "change_set"; change_set: ChangeSet }
+  | { type: "message"; text: string }
+  | { type: "done"; conversation_id: string; reply: string; error?: string | null }
+  | { type: "error"; message: string };
+
+// --- Soubory ----------------------------------------------------------------------------
+
+export type FileRole = "primary" | "gallery" | "manual" | "receipt" | "warranty" | "other";
+
+export interface FileInfo {
+  id: string;
+  kind: "photo" | "document";
+  mime: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  original_name: string | null;
+  caption: string | null;
+  taken_at: string | null;
+  blurhash: string | null;
+  thumbs_ready: boolean;
+  created_at: string;
+  url: string;
+  thumb_256_url: string | null;
+  thumb_1024_url: string | null;
+}
+
+export interface FileLink {
+  id: string;
+  item_id: string | null;
+  location_id: string | null;
+  role: FileRole;
+  is_primary: boolean;
+  sort_order: number;
+  caption: string | null;
+  created_at: string;
+  file: FileInfo;
+}
+
+export interface UploadResult {
+  file: FileInfo;
+  link: FileLink | null;
+  duplicate: boolean;
+}
+
+// --- Čtení fotek AI (F7) ----------------------------------------------------------------
+
+export type AnalysisStatus = "queued" | "running" | "done" | "failed";
+export type DetectionStatus = "pending" | "accepted" | "edited" | "rejected" | "merged";
+
+export interface DetectionSuggestion {
+  name: string;
+  category_path: string[];
+  tags: string[];
+  brand?: string | null;
+  model?: string | null;
+  quantity: number;
+  unit: string;
+  notes?: string | null;
+  text_read?: string | null;
+}
+
+export interface Detection {
+  id: string;
+  label: string;
+  description?: string | null;
+  /** [x, y, w, h] normalizované 0–1 vůči fotce */
+  bbox: [number, number, number, number] | null;
+  confidence: number;
+  status: DetectionStatus;
+  suggested: DetectionSuggestion;
+  suggested_location: { id: string | null; path: string[] | null; reason?: string | null } | null;
+  matched_item: {
+    id: string;
+    name: string;
+    label_code: string;
+    location_path?: string | null;
+  } | null;
+  item_id?: string | null;
+}
+
+export interface PhotoAnalysis {
+  id: string;
+  status: AnalysisStatus;
+  error?: string | null;
+  file_id: string;
+  scene?: string | null;
+  detections: Detection[];
+}
+
+export interface DetectionOverrides {
+  name?: string;
+  category_path?: string[];
+  tags?: string[];
+  brand?: string;
+  model?: string;
+  quantity?: number;
+  unit?: string;
+  notes?: string;
+  location_id?: string;
+  location_path?: string[];
+}
+
+export interface DetectionDecision {
+  detection_id: string;
+  action: "accept" | "reject" | "merge";
+  overrides?: DetectionOverrides;
+}
+
+export interface CommitResult {
+  change_set: ChangeSet;
+  created_item_ids: string[];
+}
