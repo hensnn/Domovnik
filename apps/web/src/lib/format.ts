@@ -33,6 +33,13 @@ export function formatMoney(value: string | number | null | undefined, currency 
   });
 }
 
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toLocaleString("cs-CZ", { maximumFractionDigits: 0 })} kB`;
+  return `${(bytes / 1024 / 1024).toLocaleString("cs-CZ", { maximumFractionDigits: 1 })} MB`;
+}
+
 export const STATUS_TONE: Record<ItemStatus, "slate" | "green" | "amber" | "red" | "blue"> = {
   stored: "green",
   in_use: "blue",

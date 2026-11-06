@@ -10,6 +10,7 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronLeft,
+  Camera,
   ChevronRight,
   Columns3,
   Filter,
@@ -26,6 +27,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api_, useApiMutation, useItem, useItems, useSettings } from "../../api/hooks";
 import type { Item, ItemFilters, ItemStatus } from "../../api/types";
 import { CategorySelect, LocationSelect, TagInput } from "../../components/Pickers";
+import { Thumb } from "../../components/Thumb";
 import {
   Badge,
   Button,
@@ -168,11 +170,14 @@ export default function ItemsPage() {
         id: "name",
         header: t("items.name"),
         cell: ({ row }) => (
-          <div className="min-w-0">
-            <div className="truncate font-medium">{row.original.name}</div>
-            {row.original.brand && (
-              <div className="truncate text-xs text-slate-500">{row.original.brand}</div>
-            )}
+          <div className="flex min-w-0 items-center gap-3">
+            <Thumb fileId={row.original.primary_file_id} className="size-10" />
+            <div className="min-w-0">
+              <div className="truncate font-medium">{row.original.name}</div>
+              {row.original.brand && (
+                <div className="truncate text-xs text-slate-500">{row.original.brand}</div>
+              )}
+            </div>
           </div>
         ),
       },
@@ -324,9 +329,14 @@ export default function ItemsPage() {
           </div>
         </div>
         {canWrite && !filters.trash && (
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            <Plus className="size-4" /> {t("items.add")}
-          </Button>
+          <>
+            <Button onClick={() => navigate("/add-photo")}>
+              <Camera className="size-4" /> {t("nav.addPhoto")}
+            </Button>
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              <Plus className="size-4" /> {t("items.add")}
+            </Button>
+          </>
         )}
       </div>
 
@@ -454,18 +464,23 @@ export default function ItemsPage() {
                 onClick={() => openItem(item.id)}
                 className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 text-left hover:border-brand-500 dark:border-slate-800 dark:bg-slate-900"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-medium">{item.name}</span>
-                  <Badge tone={STATUS_TONE[item.status]}>{t(`status.${item.status}`)}</Badge>
-                </div>
-                <div className="mt-1 truncate text-sm text-slate-500">
-                  {item.placements.length ? placementSummary(item) : t("items.unplaced")}
-                </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                  <span>{item.category_path ?? t("items.noCategory")}</span>
-                  <span className={item.is_low_stock ? "font-semibold text-amber-600" : ""}>
-                    {formatQty(item.total_quantity, item.unit)}
-                  </span>
+                <div className="flex items-start gap-3">
+                  <Thumb fileId={item.primary_file_id} className="size-14" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium">{item.name}</span>
+                      <Badge tone={STATUS_TONE[item.status]}>{t(`status.${item.status}`)}</Badge>
+                    </div>
+                    <div className="mt-1 truncate text-sm text-slate-500">
+                      {item.placements.length ? placementSummary(item) : t("items.unplaced")}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                      <span>{item.category_path ?? t("items.noCategory")}</span>
+                      <span className={item.is_low_stock ? "font-semibold text-amber-600" : ""}>
+                        {formatQty(item.total_quantity, item.unit)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </button>
             ))}
