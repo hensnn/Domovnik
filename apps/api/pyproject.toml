@@ -8,6 +8,10 @@ dependencies = [
   "uvicorn[standard]>=0.30",
   "pydantic-settings>=2.4",
   "psycopg[binary]>=3.2",
+  "sqlalchemy>=2.1.8",
+  "alembic>=1.20.1",
+  "argon2-cffi>=25.1.0",
+  "cryptography>=50.0.2",
 ]
 
 [dependency-groups]
@@ -32,9 +36,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S"]
+ignore = ["S105", "S106", "SIM905"]  # S105/6: názvy proměnných „password/secret“ nejsou tajemství
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+"migrations/*" = ["E501"]
+"src/domovnik/settings_registry.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
