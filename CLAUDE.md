@@ -15,6 +15,7 @@ Z kořene repa (vyžaduje `pnpm`, `uv`, Docker; `uv` na Windows bývá v `%APPDA
 - `pnpm db:up` / `pnpm db:down` – jen databáze
 - `pnpm lint` / `pnpm test` / `pnpm build` – kontroly (api: ruff, mypy, pytest; web: eslint, tsc, prettier, vitest)
 - `pnpm test:api` s `DATABASE_URL` v prostředí spustí i integrační testy proti DB
+- `pnpm db:migrate` / `pnpm db:seed` – migrace a ukázková data; `DOMOVNIK_FAKE_AI=1` zapne demo AI bez API klíče; testy: `DOMOVNIK_TEST_DB=<jedinečný název> pnpm test:api` (testy databázi mažou!)
 - Lokální konfigurace: zkopíruj `.env.example` → `.env` (necommituje se)
 - Soubory (F4): úložiště je `FILES_DIR` (výchozí `./data/files`); `uv run domovnik files-gc --hours 24` smaže nepoužité soubory; rozhodnutí v `docs/adr/0001-uloziste-souboru.md`
 
@@ -47,4 +48,4 @@ Poznámky: TypeScript je připnutý na `~5.9`, protože `typescript-eslint` zat�
 - Žádná odchylka od `docs/01-navrh.md` bez zápisu do `docs/adr/`.
 
 ## Kde začít
-Aktuální fáze: **F1** (F0 kostra hotová; viz `docs/04-postup-claude-code.md`, sekce 3). Před každou fází použij plan mode a nech si předložit plán ke schválení.
+Aktuální stav a další kroky: **`docs/05-stav-projektu.md`**; plán fází: `docs/04-postup-claude-code.md`, sekce 3; odložené otázky: `docs/odlozene-otazky.md`. Před každou fází použij plan mode a nech si předložit plán ke schválení.

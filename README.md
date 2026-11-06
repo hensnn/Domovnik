@@ -3,6 +3,8 @@
 | Soubor | Obsah |
 |---|---|
 | [docs/00-rozhodnuti.md](docs/00-rozhodnuti.md) | Tvoje odpovědi a z nich odvozená rozhodnutí + zbývající otevřené otázky |
+| [docs/05-stav-projektu.md](docs/05-stav-projektu.md) | **Aktuální stav**: co je hotové, jak spustit, jak vyzkoušet AI, omezení |
+| [docs/odlozene-otazky.md](docs/odlozene-otazky.md) | Otázky odložené na později (s výchozími hodnotami) |
 | [docs/01-navrh.md](docs/01-navrh.md) | Hlavní návrh: stack, architektura, moduly, AI asistent, hlas, integrace (CSV/MQTT/API/MCP), nastavení, UI, **nasazení na Proxmox LXC**, bezpečnost, **nedostatky zadání**, **další funkce**, roadmapa |
 | [docs/02-databaze.md](docs/02-databaze.md) | Návrh databáze, ER diagram, klíčová rozhodnutí |
 | [db/schema.sql](db/schema.sql) | Referenční schéma PostgreSQL 16 (ověřeno načtením + smoke testem) |
