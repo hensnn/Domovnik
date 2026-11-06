@@ -220,6 +220,7 @@ class ItemOut(ORM):
     owner_id: uuid.UUID | None
     attributes: dict[str, Any]
     primary_file_id: uuid.UUID | None
+    file_count: int = 0  # počet připojených souborů (fotky + dokumenty)
     created_at: datetime
     updated_at: datetime
     version: int
@@ -401,3 +402,77 @@ class AuditOut(ORM):
     before: Any | None
     after: Any | None
     change_set_id: uuid.UUID | None
+
+
+# --- Soubory (fotky, dokumenty) -----------------------------------------------------------
+
+FileRole = Literal["primary", "gallery", "manual", "receipt", "warranty", "other"]
+
+
+class FileOut(BaseModel):
+    """Soubor v úložišti. Obsah: ``url`` (originál / dokument), ``thumb_*_url`` (jen fotky)."""
+
+    id: uuid.UUID
+    kind: Literal["photo", "document"]
+    mime: str
+    size_bytes: int
+    width: int | None
+    height: int | None
+    original_name: str | None
+    caption: str | None
+    taken_at: datetime | None
+    exif: dict[str, Any] | None
+    blurhash: str | None
+    thumbs_ready: bool
+    created_at: datetime
+    url: str
+    thumb_256_url: str | None
+    thumb_1024_url: str | None
+
+
+class FileLinkOut(BaseModel):
+    """Vazba souboru na věc nebo umístění; ``caption`` je popisek vazby (jinak popisek souboru)."""
+
+    id: uuid.UUID
+    item_id: uuid.UUID | None
+    location_id: uuid.UUID | None
+    role: FileRole
+    is_primary: bool
+    sort_order: int
+    caption: str | None
+    created_at: datetime
+    file: FileOut
+
+
+class UploadOut(BaseModel):
+    file: FileOut
+    link: FileLinkOut | None = None
+    duplicate: bool = False  # stejný obsah už v úložišti byl – nic se neuložilo podruhé
+
+
+class BatchUploadEntry(BaseModel):
+    filename: str | None
+    ok: bool
+    error: str | None = None
+    upload: UploadOut | None = None
+
+
+class BatchUploadOut(BaseModel):
+    results: list[BatchUploadEntry]
+    ok: int
+    failed: int
+
+
+class FileLinkPatch(BaseModel):
+    """Částečná úprava vazby – mění se jen pole, která klient poslal."""
+
+    role: FileRole | None = None
+    caption: str | None = None
+    sort_order: int | None = Field(default=None, ge=0)
+    is_primary: bool | None = None  # True = nastavit jako primární
+
+
+class FileOrder(BaseModel):
+    """Nové pořadí vazeb (ID vazeb od prvního). Nevyjmenované vazby zůstanou za nimi."""
+
+    link_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
