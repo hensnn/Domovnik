@@ -12,12 +12,13 @@ from sqlalchemy.orm import Session
 
 from domovnik.ai import changesets
 from domovnik.ai import ops as ops_mod
-from domovnik.ai.providers.base import ToolSpec
+from domovnik.ai.providers import get_provider
+from domovnik.ai.providers.base import ProviderError, ToolSpec
 from domovnik.context import ActorContext
 from domovnik.db.models import AiChangeSet, ItemPlacement
 from domovnik.errors import DomainError, ValidationFailed
 from domovnik.schemas import ItemOut
-from domovnik.services import categories, items, locations, search, stats
+from domovnik.services import categories, embeddings, items, locations, search, stats
 from domovnik.services import settings as settings_service
 from domovnik.services.search import ItemFilter
 
@@ -279,6 +280,18 @@ class ToolRuntime:
         low_stock: bool | None = None,
         limit: int = 10,
     ) -> dict[str, Any]:
+        threshold = float(settings_service.get_value(self.db, "search.fuzzy_threshold"))
+        wanted = max(1, min(limit, MAX_RESULTS))
+        has_filters = any([category_id, location_id, status, unplaced, low_stock])
+        if query and not has_filters and embeddings.is_enabled(self.db):
+            try:
+                provider = get_provider(self.db, "chat")
+            except ProviderError:
+                provider = None
+            found = embeddings.hybrid_search(
+                self.db, provider, query, limit=wanted, fuzzy_threshold=threshold
+            )
+            return {"total": len(found), "items": [compact_item(i) for i in found]}
         page = search.search_items(
             self.db,
             ItemFilter(
@@ -288,10 +301,8 @@ class ToolRuntime:
                 status=status,
                 unplaced=unplaced,
                 low_stock=low_stock,
-                limit=max(1, min(limit, MAX_RESULTS)),
-                fuzzy_threshold=float(
-                    settings_service.get_value(self.db, "search.fuzzy_threshold")
-                ),
+                limit=wanted,
+                fuzzy_threshold=threshold,
             ),
         )
         return {"total": page.total, "items": [compact_item(i) for i in page.items]}

@@ -23,7 +23,7 @@ from domovnik.context import ActorContext, bind_context
 from domovnik.db import get_sessionmaker
 from domovnik.db.models import AiConversation, AiMessage
 from domovnik.errors import NotFound
-from domovnik.services import locations
+from domovnik.services import embeddings, locations
 from domovnik.services import settings as settings_service
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -307,3 +307,19 @@ def undo_change_set(cs_id: uuid.UUID, rc: RequestCtx = Depends(deps.write)) -> d
     cs = changesets.undo_change_set(rc.db, rc.ctx, cs_id)
     rc.commit()
     return changesets.describe_change_set(rc.db, cs)
+
+
+# --- Sémantické hledání -------------------------------------------------------------------
+
+
+@router.post("/embeddings/sync")
+def sync_embeddings(
+    limit: int = Query(500, ge=1, le=5000), rc: RequestCtx = Depends(deps.admin)
+) -> dict[str, Any]:
+    """Dopočítá embeddings věcí (jen změněné). Vyžaduje nastavený model v Nastavení → AI."""
+    from domovnik.ai.providers import get_provider
+
+    provider = get_provider(rc.db, "chat")
+    result = embeddings.sync(rc.db, provider, limit=limit)
+    rc.commit()
+    return {"embedded": result.embedded, "skipped": result.skipped, "model": result.model}
