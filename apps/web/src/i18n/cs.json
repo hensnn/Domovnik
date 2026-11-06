@@ -1,0 +1,9 @@
+{
+  "app": { "name": "Domovník", "tagline": "Domácí inventář s AI asistentem" },
+  "health": {
+    "title": "Stav služby",
+    "loading": "Kontroluji…",
+    "ok": "API běží (verze {{version}})",
+    "error": "API není dostupné"
+  }
+}
