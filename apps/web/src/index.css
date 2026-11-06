@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-brand-50: #eefbf5;
+  --color-brand-100: #d6f5e6;
+  --color-brand-500: #16a37a;
+  --color-brand-600: #0f8a66;
+  --color-brand-700: #0c6f53;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+}
+
+/* Velká tlačítka pro práci v rukavicích (nastavení ui.large_buttons) */
+.large-controls button,
+.large-controls [role="button"],
+.large-controls input,
+.large-controls select {
+  min-height: 3rem;
+}
+
+/* Bezpečné odsazení u spodní navigace na mobilech s „home indicator“ */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

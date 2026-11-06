@@ -1,23 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
+import { Route, Routes } from "react-router-dom";
 
-import { fetchHealth } from "./api";
+import Layout from "./components/Layout";
+import CategoriesPage from "./features/categories/CategoriesPage";
+import DashboardPage from "./features/dashboard/DashboardPage";
+import ItemsPage from "./features/items/ItemsPage";
+import LocationsPage from "./features/locations/LocationsPage";
+import SettingsPage from "./features/settings/SettingsPage";
 
 export default function App() {
-  const { t } = useTranslation();
-  const health = useQuery({ queryKey: ["health"], queryFn: fetchHealth, retry: false });
-
   return (
-    <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-3xl font-bold">{t("app.name")}</h1>
-      <p className="text-slate-600">{t("app.tagline")}</p>
-
-      <section className="mt-6 rounded-lg border border-slate-200 p-4">
-        <h2 className="font-semibold">{t("health.title")}</h2>
-        {health.isPending && <p>{t("health.loading")}</p>}
-        {health.isError && <p role="alert">{t("health.error")}</p>}
-        {health.isSuccess && <p>{t("health.ok", { version: health.data.version })}</p>}
-      </section>
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="items" element={<ItemsPage />} />
+        <Route path="items/:id" element={<ItemsPage />} />
+        <Route path="locations" element={<LocationsPage />} />
+        <Route path="locations/:id" element={<LocationsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<DashboardPage />} />
+      </Route>
+    </Routes>
   );
 }

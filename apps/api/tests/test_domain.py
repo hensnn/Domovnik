@@ -274,3 +274,18 @@ def test_unknown_references_give_not_found(db: Session, ctx: ActorContext) -> No
         items.create_item(db, ctx, ItemCreate(name="X", category_id=uuid.uuid4()))
     with pytest.raises(NotFound):
         locations.create_location(db, ctx, LocationCreate(name="X", parent_id=uuid.uuid4()))
+
+
+def test_locations_listed_depth_first_sorted_by_name(db: Session, ctx: ActorContext) -> None:
+    dum = loc(db, ctx, "Dům")
+    loc(db, ctx, "Sklep", dum)
+    patro = loc(db, ctx, "Patro", dum)
+    loc(db, ctx, "Ložnice", patro)
+    loc(db, ctx, "Zahrada")
+    assert [x.name for x in locations.list_locations(db)] == [
+        "Dům",
+        "Patro",
+        "Ložnice",
+        "Sklep",
+        "Zahrada",
+    ]

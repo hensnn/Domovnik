@@ -218,9 +218,27 @@ _LIST_SQL = text(
 
 
 def list_locations(db: Session, *, include_archived: bool = False) -> list[LocationOut]:
-    """Plochý seznam (seřazený podle cesty) s plným názvem a počty položek; klient složí strom."""
+    """Plochý seznam v pořadí průchodu stromem (sourozenci dle sort_order, pak názvu).
+
+    Strom si klient složí přes ``parent_id``; ``full_name`` a počty položek jsou předpočítané.
+    """
     rows = db.execute(_LIST_SQL, {"include_archived": include_archived}).mappings().all()
-    return [LocationOut.model_validate(dict(r)) for r in rows]
+    items = [LocationOut.model_validate(dict(r)) for r in rows]
+    children: dict[uuid.UUID | None, list[LocationOut]] = {}
+    ids = {i.id for i in items}
+    for item in items:
+        # potomek archivovaného rodiče (při skrytých archivovaných) se chová jako kořen
+        key = item.parent_id if item.parent_id in ids else None
+        children.setdefault(key, []).append(item)
+    ordered: list[LocationOut] = []
+
+    def walk(parent: uuid.UUID | None) -> None:
+        for child in sorted(children.get(parent, []), key=lambda x: (x.sort_order, x.name.lower())):
+            ordered.append(child)
+            walk(child.id)
+
+    walk(None)
+    return ordered
 
 
 def get_location_out(db: Session, location_id: uuid.UUID) -> LocationOut:
