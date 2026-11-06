@@ -195,6 +195,25 @@ REGISTRY: dict[str, SettingDef] = _d(
         max=200,
     ),
     SettingDef(
+        "photos.max_batch_files",
+        "int",
+        50,
+        "photos",
+        "Maximum souborů v jednom hromadném nahrání",
+        min=1,
+        max=500,
+    ),
+    SettingDef(
+        "photos.max_megapixels",
+        "int",
+        64,
+        "photos",
+        "Maximální velikost obrázku (megapixely)",
+        description="Ochrana proti „decompression bomb“: větší obrázky se odmítnou před dekódováním.",
+        min=1,
+        max=500,
+    ),
+    SettingDef(
         "photos.auto_analyze", "bool", False, "photos", "Po nahrání automaticky analyzovat AI"
     ),
     # --- Vyhledávání

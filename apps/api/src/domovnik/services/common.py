@@ -23,6 +23,11 @@ _CONSTRAINT_MESSAGES = {
     "items_label_code_key": "Štítek věci už existuje.",
     "users_username_key": "Uživatelské jméno už existuje.",
     "tags_name_key": "Štítek (tag) s tímto názvem už existuje.",
+    "files_sha256_key": "Soubor se stejným obsahem už existuje.",
+    "file_links_item_file_uq": "Soubor je k této věci už připojen.",
+    "file_links_loc_file_uq": "Soubor je k tomuto umístění už připojen.",
+    "file_links_item_primary_uq": "Věc už má primární soubor.",
+    "file_links_loc_primary_uq": "Umístění už má primární soubor.",
 }
 
 

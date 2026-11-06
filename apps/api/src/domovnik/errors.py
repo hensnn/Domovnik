@@ -30,6 +30,11 @@ class ValidationFailed(DomainError):
     code = "validation_failed"
 
 
+class PayloadTooLarge(DomainError):
+    status = 413
+    code = "payload_too_large"
+
+
 class Forbidden(DomainError):
     status = 403
     code = "forbidden"
