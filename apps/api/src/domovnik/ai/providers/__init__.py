@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections import deque
 from collections.abc import Callable
@@ -126,6 +127,10 @@ def get_provider(db: Session, task: Task = "chat") -> Provider:
     """Provider pro danou úlohu (chat / vision / embeddings) dle nastavení."""
     if _override is not None:
         return _override
+    if os.getenv("DOMOVNIK_FAKE_AI") == "1":  # jen vývoj: ukázkový poskytovatel bez API klíče
+        from domovnik.ai.providers.fake import DemoProvider
+
+        return DemoProvider()
 
     def get(key: str) -> Any:
         return settings_service.get_value(db, key)
