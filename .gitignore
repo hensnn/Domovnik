@@ -27,3 +27,4 @@ Thumbs.db
 
 # Pracovní worktree agentů Claude Code
 .claude/worktrees/
+!deploy/.env.prod.example

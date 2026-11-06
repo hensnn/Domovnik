@@ -1,0 +1,32 @@
+# Režim s vlastním HTTPS (interní CA): Caddy si vystaví certifikát pro {$DOMOVNIK_HOST}.
+# Kořenový certifikát (docker volume caddy_data → pki/authorities/local/root.crt) nainstaluj do telefonů.
+{
+	email {$ADMIN_EMAIL:admin@localhost}
+}
+
+{$DOMOVNIK_HOST:domovnik.local} {
+	tls internal
+	encode zstd gzip
+
+	handle /api/* {
+		# SSE (živé události, chat) – žádné bufferování
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 300s
+			}
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+	}
+	request_body {
+		max_size 50MB
+	}
+}

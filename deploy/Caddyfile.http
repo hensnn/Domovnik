@@ -1,0 +1,25 @@
+# Režim za Nginx Proxy Managerem (HTTPS řeší NPM s Let's Encrypt): Caddy jen na HTTP :8080.
+{
+	auto_https off
+}
+
+:8080 {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 300s
+			}
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+	request_body {
+		max_size 50MB
+	}
+}

@@ -33,3 +33,24 @@ def test_ready_with_database() -> None:
     r = client.get("/api/v1/health/ready")
     assert r.status_code == 200
     assert r.json()["database"] == "ok"
+
+
+def test_production_refuses_insecure_config() -> None:
+    import pytest
+
+    from domovnik.config import Settings
+
+    with pytest.raises(RuntimeError):
+        Settings(domovnik_env="production").check_production()  # výchozí (veřejný) klíč
+    with pytest.raises(RuntimeError):
+        Settings(
+            domovnik_env="production",
+            secret_key="x" * 40,
+            database_url="postgresql://domovnik:domovnik_dev@db/domovnik",
+        ).check_production()
+    Settings(
+        domovnik_env="production",
+        secret_key="x" * 40,
+        database_url="postgresql://domovnik:silne-heslo@db/domovnik",
+    ).check_production()  # v pořádku
+    Settings().check_production()  # vývoj: bez omezení

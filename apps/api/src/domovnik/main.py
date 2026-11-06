@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -15,7 +16,15 @@ from domovnik.config import get_settings
 from domovnik.db import check_database
 from domovnik.errors import DomainError
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    get_settings().check_production()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Domovník API",
     version=__version__,
     description="Domácí inventář s AI asistentem. Autentizace: cookie relace (web) nebo "
