@@ -268,3 +268,136 @@ class TagOut(ORM):
     name: str
     color: str | None
     item_count: int = 0
+
+
+# --- Uživatelé, relace, tokeny ------------------------------------------------------------
+
+
+class UserOut(ORM):
+    id: uuid.UUID
+    username: str
+    display_name: str
+    email: str | None
+    role: str
+    locale: str
+    timezone: str
+    is_active: bool
+    last_login_at: datetime | None
+
+
+class SetupIn(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    display_name: str = Field(default="", max_length=100)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str = Field(max_length=200)
+
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    display_name: str = Field(default="", max_length=100)
+    password: str = Field(max_length=200)
+    role: Literal["admin", "member", "viewer", "guest"] = "member"
+    email: str | None = None
+
+
+class UserPatch(BaseModel):
+    display_name: str | None = None
+    email: str | None = None
+    role: Literal["admin", "member", "viewer", "guest"] | None = None
+    is_active: bool | None = None
+    password: str | None = Field(default=None, max_length=200)
+    locale: str | None = None
+    timezone: str | None = None
+
+
+class MeOut(BaseModel):
+    user: UserOut
+    scopes: list[str]
+    csrf_token: str | None
+
+
+class TokenCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    scopes: list[str] = Field(default_factory=lambda: ["items:read"])
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
+
+
+class TokenOut(ORM):
+    id: uuid.UUID
+    name: str
+    scopes: list[str]
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+    created_at: datetime
+
+
+class TokenCreated(TokenOut):
+    token: str  # holá hodnota se zobrazí jen jednou
+
+
+# --- Ostatní ------------------------------------------------------------------------------
+
+
+class SettingUpdate(BaseModel):
+    value: Any
+    scope: Literal["global", "user"] = "user"
+
+
+class CategoryMerge(BaseModel):
+    target_id: uuid.UUID
+
+
+class TagRename(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class BulkRequest(BaseModel):
+    """Hromadná operace nad více věcmi."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    action: Literal["move", "set_category", "add_tags", "remove_tags", "set_status", "delete"]
+    location_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
+    tags: list[str] = Field(default_factory=list)
+    status: ItemStatus | None = None
+
+
+class BulkResult(BaseModel):
+    ok: int
+    failed: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ItemPageOut(BaseModel):
+    items: list[ItemOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class SearchOut(BaseModel):
+    items: list[ItemOut]
+    locations: list[LocationOut]
+    categories: list[CategoryOut]
+
+
+class AuditOut(ORM):
+    id: int
+    at: datetime
+    actor_id: uuid.UUID | None
+    source: str | None
+    entity_type: str
+    entity_id: uuid.UUID
+    action: str
+    before: Any | None
+    after: Any | None
+    change_set_id: uuid.UUID | None

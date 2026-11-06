@@ -7,14 +7,17 @@
     "db:down": "docker compose -f deploy/compose.dev.yml down",
     "dev:api": "uv run --directory apps/api uvicorn domovnik.main:app --reload --port 8000",
     "dev:web": "pnpm --filter web dev",
-    "dev": "pnpm db:up && concurrently -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev": "pnpm db:up && pnpm db:migrate && concurrently -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
     "lint:api": "uv run --directory apps/api ruff check . && uv run --directory apps/api ruff format --check . && uv run --directory apps/api mypy",
     "lint:web": "pnpm --filter web lint && pnpm --filter web typecheck && pnpm --filter web format:check",
     "lint": "pnpm lint:api && pnpm lint:web",
     "test:api": "uv run --directory apps/api pytest -q",
     "test:web": "pnpm --filter web test",
     "test": "pnpm test:api && pnpm test:web",
-    "build": "pnpm --filter web build"
+    "build": "pnpm --filter web build",
+    "db:migrate": "uv run --directory apps/api domovnik migrate",
+    "db:seed": "uv run --directory apps/api domovnik seed",
+    "create-admin": "uv run --directory apps/api domovnik create-admin"
   },
   "devDependencies": {
     "concurrently": "^10.0.6"
