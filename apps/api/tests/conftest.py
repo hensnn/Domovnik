@@ -20,7 +20,7 @@ from domovnik.db.models import User
 
 API_DIR = Path(__file__).resolve().parent.parent
 BASE_URL = os.getenv("DATABASE_URL", "postgresql://domovnik:domovnik_dev@localhost:5432/domovnik")
-TEST_DB = "domovnik_test"
+TEST_DB = os.getenv("DOMOVNIK_TEST_DB", "domovnik_test")  # unikátní per worktree
 
 
 def _swap_db(url: str, name: str) -> str:

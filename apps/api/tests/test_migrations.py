@@ -9,11 +9,11 @@ import pytest
 from alembic import command
 from alembic.config import Config
 
-from .conftest import API_DIR, BASE_URL, _swap_db
+from .conftest import API_DIR, BASE_URL, TEST_DB, _swap_db
 
 
 def test_upgrade_downgrade_upgrade_and_models_match() -> None:
-    name = "domovnik_migtest"
+    name = f"{TEST_DB}_mig"
     try:
         with psycopg.connect(BASE_URL, autocommit=True, connect_timeout=3) as conn:
             conn.execute(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
