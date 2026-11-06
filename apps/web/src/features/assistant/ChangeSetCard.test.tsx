@@ -69,7 +69,7 @@ describe("ChangeSetCard", () => {
     const { calls } = mockFetch([
       [
         /^POST \/ai\/change-sets\/cs1\/apply$/,
-        () => ({ ...proposed, status: "partially_applied", reversible: true }),
+        () => ({ ...proposed, status: "partially_applied", reversible: null }),
       ],
     ]);
     renderWithProviders(<ChangeSetCard changeSet={proposed} />);
@@ -78,6 +78,7 @@ describe("ChangeSetCard", () => {
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0].body).toEqual({ skip_operation_ids: ["o2"] });
     expect(await screen.findByText("Provedeno částečně")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Vrátit zpět" })).toBeInTheDocument();
   });
 
   it("zamítnutí zavolá /reject", async () => {

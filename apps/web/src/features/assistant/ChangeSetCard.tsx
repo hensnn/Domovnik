@@ -62,6 +62,11 @@ export default function ChangeSetCard({
   const busy = apply.isPending || reject.isPending || undo.isPending;
 
   const proposed = cs.status === "proposed";
+  // u částečně provedeného balíčku API `reversible` nevyplňuje (null) – vrátit lze i tak
+  const canUndo =
+    canWrite &&
+    (cs.status === "applied" || cs.status === "partially_applied") &&
+    cs.reversible !== false;
   const selectedCount = cs.operations.filter((o) => !skipped.has(o.id)).length;
   const toggle = (id: string, on: boolean) => {
     const next = new Set(skipped);
@@ -150,19 +155,17 @@ export default function ChangeSetCard({
         </div>
       )}
 
-      {canWrite &&
-        (cs.status === "applied" || cs.status === "partially_applied") &&
-        cs.reversible && (
-          <div>
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => undo.mutate(undefined, { onError: fail })}
-            >
-              <Undo2 className="size-4" /> {t("changes.undo")}
-            </Button>
-          </div>
-        )}
+      {canUndo && (
+        <div>
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => undo.mutate(undefined, { onError: fail })}
+          >
+            <Undo2 className="size-4" /> {t("changes.undo")}
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

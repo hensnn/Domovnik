@@ -358,7 +358,7 @@ export default function AssistantPage() {
           >
             <History className="size-5" />
           </IconButton>
-          <Button size="sm" onClick={newConversation}>
+          <Button size="sm" className="md:hidden" onClick={newConversation}>
             <MessageSquarePlus className="size-4" /> {t("assistant.new")}
           </Button>
         </div>
