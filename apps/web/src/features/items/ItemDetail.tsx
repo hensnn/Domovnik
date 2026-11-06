@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api_, useApiMutation, useItem, useItemMovements, useLocations } from "../../api/hooks";
 import type { Item, Placement } from "../../api/types";
 import { LocationSelect } from "../../components/Pickers";
+import FileGallery from "../files/FileGallery";
 import {
   Badge,
   Button,
@@ -105,6 +106,8 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
         <History id={id} />
       ) : (
         <div className="space-y-6 p-4">
+          <FileGallery kind="item" id={item.id} canWrite={canWrite && !item.deleted_at} />
+
           <section>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="font-semibold">{t("items.whereIs")}</h3>

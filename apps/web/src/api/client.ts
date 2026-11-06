@@ -7,6 +7,10 @@ export function setCsrfToken(token: string | null) {
   csrfToken = token;
 }
 
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
 export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;
 }
@@ -44,6 +48,7 @@ export function buildQuery(params?: Params): string {
 
 export interface RequestOptions {
   params?: Params;
+  /** Objekt se pošle jako JSON; FormData jako multipart (Content-Type doplní prohlížeč). */
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
@@ -55,13 +60,14 @@ export async function api<T>(
   { params, body, headers, signal }: RequestOptions = {},
 ): Promise<T> {
   const h: Record<string, string> = { Accept: "application/json", ...headers };
-  if (body !== undefined) h["Content-Type"] = "application/json";
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) h["Content-Type"] = "application/json";
   if (csrfToken && method !== "GET") h["X-CSRF-Token"] = csrfToken;
 
   const res = await fetch(`/api/v1${path}${buildQuery(params)}`, {
     method,
     headers: h,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     credentials: "same-origin",
     signal,
   });
@@ -70,23 +76,26 @@ export async function api<T>(
   const text = await res.text();
   const data = text ? safeJson(text) : null;
 
-  if (!res.ok) {
-    if (res.status === 401 && !path.startsWith("/auth/")) onUnauthorized?.();
-    const d = (data ?? {}) as Record<string, unknown>;
-    let message = typeof d.detail === "string" ? d.detail : `Chyba ${res.status}`;
-    if (Array.isArray(d.detail)) {
-      // validační chyby FastAPI (422)
-      message = (d.detail as { loc?: unknown[]; msg?: string }[])
-        .map((e) => `${(e.loc ?? []).slice(1).join(".")}: ${e.msg ?? ""}`)
-        .join("; ");
-    }
-    const code = typeof d.title === "string" ? d.title : "error";
-    throw new ApiError(res.status, code, message, d);
-  }
+  if (!res.ok) throw errorFromResponse(res.status, data, path);
   return data as T;
 }
 
-function safeJson(text: string): unknown {
+/** Převede tělo chyby (problem+json) na ApiError; 401 mimo /auth/ odhlásí. */
+export function errorFromResponse(status: number, data: unknown, path = ""): ApiError {
+  if (status === 401 && !path.startsWith("/auth/")) onUnauthorized?.();
+  const d = (data ?? {}) as Record<string, unknown>;
+  let message = typeof d.detail === "string" ? d.detail : `Chyba ${status}`;
+  if (Array.isArray(d.detail)) {
+    // validační chyby FastAPI (422)
+    message = (d.detail as { loc?: unknown[]; msg?: string }[])
+      .map((e) => `${(e.loc ?? []).slice(1).join(".")}: ${e.msg ?? ""}`)
+      .join("; ");
+  }
+  const code = typeof d.title === "string" ? d.title : "error";
+  return new ApiError(status, code, message, d);
+}
+
+export function safeJson(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
@@ -98,6 +107,8 @@ export const get = <T>(path: string, params?: Params, signal?: AbortSignal) =>
   api<T>("GET", path, { params, signal });
 export const post = <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
   api<T>("POST", path, { body: body ?? {}, headers });
+export const postForm = <T>(path: string, form: FormData, signal?: AbortSignal) =>
+  api<T>("POST", path, { body: form, signal });
 export const patch = <T>(path: string, body: unknown, headers?: Record<string, string>) =>
   api<T>("PATCH", path, { body, headers });
 export const put = <T>(path: string, body: unknown) => api<T>("PUT", path, { body });

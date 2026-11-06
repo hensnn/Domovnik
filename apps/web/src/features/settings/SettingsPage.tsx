@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 
 import { api_, useApiMutation, useSettings, useTokens, useUsers } from "../../api/hooks";
 import type { SettingDef } from "../../api/types";
@@ -28,7 +29,8 @@ export default function SettingsPage() {
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const { data, isPending } = useSettings();
-  const [tab, setTab] = useState<Tab>("ui");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(searchParams.get("tab") ?? "ui");
 
   const groups = useMemo(() => {
     const map = new Map<string, string>();

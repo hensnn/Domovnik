@@ -3,6 +3,7 @@ import {
   Archive,
   ArchiveRestore,
   ChevronDown,
+  Camera,
   ChevronRight,
   Edit3,
   FolderPlus,
@@ -17,6 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api_, useApiMutation, useItems, useLocations } from "../../api/hooks";
 import type { Location, LocationKind } from "../../api/types";
 import { LocationSelect } from "../../components/Pickers";
+import { Thumb } from "../../components/Thumb";
 import {
   Badge,
   Button,
@@ -34,6 +36,7 @@ import {
 } from "../../components/ui";
 import { type TreeNode, buildTree, formatQty, placementSummary } from "../../lib/format";
 import { useAuth } from "../auth/AuthProvider";
+import FileGallery from "../files/FileGallery";
 
 const KINDS: LocationKind[] = [
   "building",
@@ -243,6 +246,9 @@ function LocationDetail({
             <Button size="sm" onClick={() => navigate(`/items?location_id=${loc.id}&new=1`)}>
               <Plus className="size-4" /> {t("locations.addItem")}
             </Button>
+            <Button size="sm" onClick={() => navigate(`/add-photo?location_id=${loc.id}`)}>
+              <Camera className="size-4" /> {t("locations.addFromPhoto")}
+            </Button>
             <Button size="sm" onClick={() => run(() => archive.mutateAsync(undefined))}>
               {loc.archived_at ? (
                 <ArchiveRestore className="size-4" />
@@ -261,6 +267,10 @@ function LocationDetail({
             {error}
           </p>
         )}
+      </Card>
+
+      <Card>
+        <FileGallery kind="location" id={loc.id} canWrite={canWrite} />
       </Card>
 
       <Card className="!p-0">
@@ -285,6 +295,7 @@ function LocationDetail({
                   to={`/items/${i.id}`}
                   className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
+                  <Thumb fileId={i.primary_file_id} className="size-10" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{i.name}</span>
                     <span className="block truncate text-xs text-slate-500">

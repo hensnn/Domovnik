@@ -38,6 +38,21 @@ describe("api", () => {
     ).toBeUndefined();
   });
 
+  it("FormData pošle bez ručního Content-Type (boundary doplní prohlížeč) a s CSRF", async () => {
+    setCsrfToken("tok");
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 201 }));
+    const form = new FormData();
+    form.append("file", new File(["x"], "a.jpg", { type: "image/jpeg" }));
+    await api("POST", "/files", { body: form });
+    const init = spy.mock.calls[0][1]!;
+    expect(init.body).toBe(form);
+    const headers = init.headers as Record<string, string>;
+    expect(Object.keys(headers).map((k) => k.toLowerCase())).not.toContain("content-type");
+    expect(headers["X-CSRF-Token"]).toBe("tok");
+  });
+
   it("vrátí undefined pro 204 a čitelnou zprávu z validační chyby 422", async () => {
     const spy = vi
       .spyOn(globalThis, "fetch")
