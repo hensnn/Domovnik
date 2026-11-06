@@ -2,6 +2,9 @@
 # Kořenový certifikát (docker volume caddy_data → pki/authorities/local/root.crt) nainstaluj do telefonů.
 {
 	email {$ADMIN_EMAIL:admin@localhost}
+	# Klient připojený na IP adresu neposílá SNI a Caddy za Docker NAT nepozná cílovou IP –
+	# bez tohoto řádku by TLS končilo chybou „internal error“.
+	default_sni {$DOMOVNIK_HOST:domovnik.local}
 }
 
 {$DOMOVNIK_HOST:domovnik.local} {
