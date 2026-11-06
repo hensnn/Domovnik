@@ -272,7 +272,8 @@ function DetectionCard({
   const eff = { ...d.suggested, ...overrides };
   const tone = confidenceTone(d.confidence);
   const locId = overrides.location_id ?? d.suggested_location?.id ?? null;
-  const locPath = d.suggested_location?.path?.join(" › ");
+  const locPath =
+    d.suggested_location?.path?.join(" › ") ?? d.suggested_location?.full_name ?? undefined;
   const m = d.matched_item;
   const toggle = (c: Choice) => onChoice(choice === c ? "pending" : c);
 

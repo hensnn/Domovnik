@@ -336,7 +336,12 @@ export interface Detection {
   confidence: number;
   status: DetectionStatus;
   suggested: DetectionSuggestion;
-  suggested_location: { id: string | null; path: string[] | null; reason?: string | null } | null;
+  suggested_location: {
+    id: string | null;
+    path: string[] | null;
+    full_name?: string | null;
+    reason?: string | null;
+  } | null;
   matched_item: {
     id: string;
     name: string;
