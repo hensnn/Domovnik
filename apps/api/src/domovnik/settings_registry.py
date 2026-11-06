@@ -306,6 +306,24 @@ REGISTRY: dict[str, SettingDef] = _d(
         min=0,
     ),
     SettingDef("ai.temperature", "float", 0.2, "ai", "Teplota", min=0, max=2),
+    SettingDef(
+        "ai.max_tool_iterations",
+        "int",
+        6,
+        "ai",
+        "Max. kroků (volání nástrojů) na jednu odpověď",
+        min=1,
+        max=20,
+    ),
+    SettingDef(
+        "ai.history_messages",
+        "int",
+        20,
+        "ai",
+        "Kolik předchozích zpráv asistent vidí",
+        min=0,
+        max=100,
+    ),
     SettingDef("ai.history_days", "int", 90, "ai", "Uchování konverzací (dny)", min=0, max=3650),
     # --- Hlas
     SettingDef(

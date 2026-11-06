@@ -9,7 +9,8 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from domovnik import __version__
-from domovnik.api import auth, catalog, items, system
+from domovnik.ai.providers.base import NotConfigured, ProviderError, RateLimited
+from domovnik.api import ai, auth, catalog, items, system
 from domovnik.config import get_settings
 from domovnik.db import check_database
 from domovnik.errors import DomainError
@@ -50,6 +51,23 @@ async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     )
 
 
+@app.exception_handler(ProviderError)
+async def provider_error_handler(_: Request, exc: ProviderError) -> JSONResponse:
+    """Chyby poskytovatele AI: nenastaveno / limit / výpadek."""
+    status_code = 429 if isinstance(exc, RateLimited) else 503
+    code = "ai_not_configured" if isinstance(exc, NotConfigured) else "ai_unavailable"
+    return JSONResponse(
+        status_code=status_code,
+        media_type="application/problem+json",
+        content={
+            "type": f"urn:domovnik:error:{code}",
+            "title": code,
+            "status": status_code,
+            "detail": str(exc),
+        },
+    )
+
+
 @app.get("/api/v1/health", tags=["system"])
 def health() -> dict[str, str]:
     """Liveness: aplikace běží (bez kontroly databáze)."""
@@ -65,5 +83,5 @@ def ready(response: Response) -> dict[str, str]:
     return {"status": "ok" if ok else "unavailable", "database": "ok" if ok else "unavailable"}
 
 
-for module in (auth, catalog, items, system):
+for module in (auth, catalog, items, system, ai):
     app.include_router(module.router, prefix="/api/v1")

@@ -100,6 +100,7 @@ def require(scope: str) -> Callable[..., RequestCtx]:
 read = require("items:read")
 own = read  # vlastní účet a tokeny: stačí být přihlášen
 write = require("items:write")
+ai_chat = require("ai:chat")
 admin = require("admin")
 
 

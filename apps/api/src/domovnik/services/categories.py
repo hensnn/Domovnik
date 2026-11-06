@@ -118,7 +118,9 @@ def delete_category(
     if has_children:
         raise Conflict("Kategorie má podkategorie. Použij sloučení nebo je nejdřív přesuň.")
     used = db.execute(
-        select(func.count()).select_from(Item).where(Item.category_id == cat.id)
+        select(func.count())
+        .select_from(Item)
+        .where(Item.category_id == cat.id, Item.deleted_at.is_(None))  # věci v koši nevadí
     ).scalar_one()
     if used and reassign_to is None:
         raise Conflict(f"V kategorii je {used} věcí. Zadej cílovou kategorii nebo použij sloučení.")

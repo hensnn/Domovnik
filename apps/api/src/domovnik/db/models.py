@@ -316,3 +316,64 @@ class EventOutbox(Base):
     created_at: Mapped[datetime] = _now()
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+
+
+class AiConversation(Base):
+    __tablename__ = "ai_conversations"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str | None] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(Text, server_default="text")
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    archived: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+
+class AiMessage(Base):
+    __tablename__ = "ai_messages"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="CASCADE")
+    )
+    role: Mapped[str] = mapped_column(Text)
+    content: Mapped[str | None] = mapped_column(Text)
+    tool_calls: Mapped[Any | None] = mapped_column(JSONB)
+    tool_result: Mapped[Any | None] = mapped_column(JSONB)
+    file_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(Uuid), server_default=text("'{}'"))
+    model: Mapped[str | None] = mapped_column(Text)
+    tokens_in: Mapped[int | None] = mapped_column(Integer)
+    tokens_out: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 5))
+    created_at: Mapped[datetime] = _now()
+
+
+class AiChangeSet(Base):
+    __tablename__ = "ai_change_sets"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="SET NULL")
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    summary: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, server_default="proposed")
+    auto_applied: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_at: Mapped[datetime] = _now()
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AiChangeOp(Base):
+    __tablename__ = "ai_change_ops"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    change_set_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_change_sets.id", ondelete="CASCADE")
+    )
+    seq: Mapped[int] = mapped_column(Integer)
+    op: Mapped[str] = mapped_column(Text)
+    payload: Mapped[Any] = mapped_column(JSONB)
+    inverse: Mapped[Any | None] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(Text, server_default="pending")
+    error: Mapped[str | None] = mapped_column(Text)
+    result_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
