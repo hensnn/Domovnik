@@ -44,7 +44,7 @@ Kontroly: `pnpm lint`, `pnpm test` (API testy vyžadují běžící DB; vytvář
 - **Fotky**: obsah se ověřuje podle magic bytes, vždy se re-enkódují, GPS se odstraňuje, dedupe přes SHA-256 (viz `docs/adr/0001-uloziste-souboru.md`).
 
 ## Známá omezení a otevřené body
-- Hledání je fulltext + trigramy + aliasy; sémantické hledání (embeddings) zatím není zapojeno.
+- Sémantické hledání je zapojené, ale nastaví se až zadáním modelu pro embeddings (Nastavení → AI) a spuštěním `POST /ai/embeddings/sync`; do té doby hledá fulltext + trigramy + aliasy.
 - Čtení fotek posílá jednu zmenšenou fotku (bez dlaždic 2×2) – u velmi husté police může minout drobné věci.
 - Bez workeru: náhledy a analýzy běží ve vláknech API, úklidové a připomínkové úlohy zatím neexistují.
 - Offline fronta zápisů (vytvoření/přesun bez spojení) není hotová; backend je připravený (klientské `id`). Offline lze zatím jen číst uložená data.
@@ -53,4 +53,4 @@ Kontroly: `pnpm lint`, `pnpm test` (API testy vyžadují běžící DB; vytvář
 - Čtení fotek proti skutečnému Gemini zatím nikdo nezkoušel (jen falešný poskytovatel a testy).
 - Dev tip: relační cookie je sdílená mezi porty `localhost`; při souběžných dev serverech se session navzájem přepisují.
 - Optimistické zamykání: změna primární fotky zvyšuje `version` věci, UI proto věc po nahrání fotek načítá znovu.
-- Produkční nasazení (Compose, LXC skript, zálohy) a integrace (MQTT, HA/MCP, CSV) zbývají – viz `docs/04-postup-claude-code.md`.
+- Zbývá: MQTT (zatím vypnuté dle rozhodnutí), Home Assistant přes MCP, webhooky, hlasový engine na serveru (Whisper/Piper), worker na pozadí, skutečné nasazení na Proxmox – viz `docs/04-postup-claude-code.md` a `docs/odlozene-otazky.md`.
