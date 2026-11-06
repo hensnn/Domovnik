@@ -190,3 +190,27 @@ def get_or_create_path(db: Session, ctx: ActorContext, names: list[str]) -> Cate
     if current is None:  # pragma: no cover
         raise ValidationFailed("Cesta kategorie je prázdná.")
     return current
+
+
+def path_exists(db: Session, names: list[str]) -> bool:
+    """Existuje kategorie s touto cestou (bez ohledu na velikost písmen)?"""
+    parent_id: uuid.UUID | None = None
+    for raw in names:
+        found = next(
+            (
+                c
+                for c in db.execute(
+                    select(Category).where(
+                        Category.parent_id.is_(None)
+                        if parent_id is None
+                        else Category.parent_id == parent_id
+                    )
+                ).scalars()
+                if c.name.lower() == raw.strip().lower()
+            ),
+            None,
+        )
+        if found is None:
+            return False
+        parent_id = found.id
+    return True

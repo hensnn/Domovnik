@@ -285,3 +285,20 @@ def contents(
         {"rec": recursive, "p": loc.path, "id": location_id},
     ).mappings()
     return [dict(r) for r in rows]
+
+
+def path_exists(db: Session, names: list[str]) -> bool:
+    """Existuje (neanchivované) umístění s touto cestou?"""
+    parent_id: uuid.UUID | None = None
+    for raw in names:
+        stmt = select(Location).where(
+            Location.parent_id.is_(None) if parent_id is None else Location.parent_id == parent_id,
+            Location.archived_at.is_(None),
+        )
+        found = next(
+            (x for x in db.execute(stmt).scalars() if x.name.lower() == raw.strip().lower()), None
+        )
+        if found is None:
+            return False
+        parent_id = found.id
+    return True
