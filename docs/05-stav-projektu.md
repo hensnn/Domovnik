@@ -1,17 +1,21 @@
 # Stav projektu (k 2026-11-06)
 
 ## Hotovo
-| Fáze | Obsah | Větev |
-|---|---|---|
-| F0 | Kostra monorepa, DB v Dockeru, CI | `feat/f0-kostra-2` |
-| F1 | Alembic migrace, ORM, služby (umístění, kategorie, věci, tagy), audit, outbox, auth (relace + tokeny), registr nastavení | `feat/f1-jadro` |
-| F2 | REST API, hledání (bez diakritiky, překlepy, aliasy), seed, CLI, SSE | `feat/f2-api` |
-| F3 | Webové UI (přehled, věci, umístění, kategorie, nastavení, účet, uživatelé) | `feat/f3-web` |
-| F4 (backend) | Nahrávání fotek a dokumentů, náhledy, dedupe, vazby | `feat/f4-fotky` (sloučeno do F6) |
-| F6 | AI asistent: poskytovatelé, nástroje, balíčky změn s undo, chat (SSE), `/ai/ask` | `feat/f6-ai` |
-| F7 (backend) | Čtení fotek AI, duplicity, návrh umístění, revize, plán uložení | `feat/f7-ai-fotky` |
+Vše je sloučené ve větvi **`feat/integrace`** (obsahuje všechny níže uvedené části; ostatní větve jsou jen průběžné kroky).
 
-Větve na sobě stavějí (každá obsahuje předchozí). Poslední (nejúplnější) je `feat/f7-ai-fotky`; webové UI pro chat/fotky/revizi a štítky/QR/inventuru/PWA vzniká paralelně ve větvích `feat/web-ai-fotky` a `feat/f5b-stitky` (stav viz konec dokumentu).
+| Část | Obsah |
+|---|---|
+| F0–F2 | Kostra repa, Alembic, služby (umístění, kategorie, věci, tagy), audit, outbox, auth (relace + tokeny), registr nastavení, REST API, hledání (bez diakritiky, překlepy, aliasy), seed, CLI, SSE |
+| F3 | Webové UI: přehled, věci (tabulka/karty, filtry, hromadné akce, detail), umístění, kategorie, nastavení, účet, uživatelé, Ctrl+K |
+| F4 | Fotky a dokumenty: validace obsahu, re-enkódování, GPS pryč, náhledy, dedupe, galerie, nahrávání z mobilu |
+| F6 | AI asistent: Gemini / Claude / OpenAI-kompatibilní, záložní řetěz, nástroje, balíčky změn s potvrzením a vrácením zpět, chat (SSE), `/ai/ask`, hlas v prohlížeči |
+| F7 | Čtení fotek AI: analýza, duplicity, návrh umístění, revize s rámečky, ořezy, plán uložení; web „Přidat z fotky“ |
+| F5b | Štítky jako PDF (QR, A4 3×8 / 2×5 / 4×12), skenování QR, „Jsem tady“, inventura, PWA (manifest, service worker, offline čtení) |
+| F9 (část) | Import / export CSV (dry-run, mapování, české výchozí pro Excel) |
+| F10 | Produkční nasazení: Docker Compose, Caddy, skripty pro LXC, zálohy, test produkčního stacku (`docs/06-nasazeni.md`) |
+| + | Sémantické hledání (embeddings, hybridní s fulltextem) |
+
+Testy: backend 150, web 69 (vše zelené, lint, typy a build také).
 
 ## Jak to spustit (vývoj)
 ```bash
@@ -43,5 +47,10 @@ Kontroly: `pnpm lint`, `pnpm test` (API testy vyžadují běžící DB; vytvář
 - Hledání je fulltext + trigramy + aliasy; sémantické hledání (embeddings) zatím není zapojeno.
 - Čtení fotek posílá jednu zmenšenou fotku (bez dlaždic 2×2) – u velmi husté police může minout drobné věci.
 - Bez workeru: náhledy a analýzy běží ve vláknech API, úklidové a připomínkové úlohy zatím neexistují.
+- Offline fronta zápisů (vytvoření/přesun bez spojení) není hotová; backend je připravený (klientské `id`). Offline lze zatím jen číst uložená data.
+- Service worker a kamera (QR) nešlo v testovacím prohlížeči ověřit – vyzkoušej na telefonu přes HTTPS.
+- Font DejaVu v PDF štítcích: porovnej text licence (`assets/fonts/LICENSE-DejaVu.txt`) s oficiálním zněním.
+- Čtení fotek proti skutečnému Gemini zatím nikdo nezkoušel (jen falešný poskytovatel a testy).
+- Dev tip: relační cookie je sdílená mezi porty `localhost`; při souběžných dev serverech se session navzájem přepisují.
 - Optimistické zamykání: změna primární fotky zvyšuje `version` věci, UI proto věc po nahrání fotek načítá znovu.
 - Produkční nasazení (Compose, LXC skript, zálohy) a integrace (MQTT, HA/MCP, CSV) zbývají – viz `docs/04-postup-claude-code.md`.
