@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/.venv
+.git
+.claude
+data
+**/__pycache__
+.env
+deploy/.env
