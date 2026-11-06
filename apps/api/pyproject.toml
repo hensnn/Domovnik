@@ -1,0 +1,46 @@
+[project]
+name = "domovnik"
+version = "0.0.1"
+description = "Domovník – domácí inventář s AI asistentem (API)"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic-settings>=2.4",
+  "psycopg[binary]>=3.2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/domovnik"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: vyžaduje běžící PostgreSQL (DATABASE_URL)"]

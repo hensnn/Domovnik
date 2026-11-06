@@ -1,0 +1,21 @@
+# Vývojové prostředí: jen databáze. API a web se spouštějí lokálně (pnpm dev).
+name: domovnik-dev
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-domovnik}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-domovnik_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-domovnik}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-domovnik} -d ${POSTGRES_DB:-domovnik}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:

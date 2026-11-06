@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+# Env a tajemství – NIKDY necommitovat
+.env
+.env.*
+!.env.example
+secrets/
+# Data
+data/
+*.dump
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
