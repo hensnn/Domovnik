@@ -4,9 +4,11 @@ import Layout from "./components/Layout";
 import AssistantPage from "./features/assistant/AssistantPage";
 import CategoriesPage from "./features/categories/CategoriesPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
+import InventoryPage from "./features/inventory/InventoryPage";
 import ItemsPage from "./features/items/ItemsPage";
 import LocationsPage from "./features/locations/LocationsPage";
 import AddFromPhotoPage from "./features/photos/AddFromPhotoPage";
+import ScanPage from "./features/scan/ScanPage";
 import SettingsPage from "./features/settings/SettingsPage";
 
 export default function App() {
@@ -21,6 +23,9 @@ export default function App() {
         <Route path="assistant" element={<AssistantPage />} />
         <Route path="add-photo" element={<AddFromPhotoPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="scan" element={<ScanPage />} />
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/:id" element={<InventoryPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<DashboardPage />} />
       </Route>

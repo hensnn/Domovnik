@@ -410,6 +410,13 @@ REGISTRY: dict[str, SettingDef] = _d(
         choices=("A4_3x8", "A4_2x5", "A4_4x12"),
     ),
     SettingDef("labels.show_path", "bool", True, "labels", "Tisknout cestu umístění"),
+    SettingDef(
+        "labels.cut_guides",
+        "bool",
+        True,
+        "labels",
+        "Tisknout tenké ohraničení štítků (pro střih na obyčejném papíru)",
+    ),
     # --- Upozornění
     SettingDef(
         "notifications.warranty_days",

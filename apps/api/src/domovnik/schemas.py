@@ -24,6 +24,7 @@ class ORM(BaseModel):
 
 
 class LocationCreate(BaseModel):
+    id: uuid.UUID | None = None  # klient může zvolit ID (offline zápis); opakování je idempotentní
     name: str = Field(min_length=1, max_length=200)
     parent_id: uuid.UUID | None = None
     kind: LocationKind = "other"
@@ -148,6 +149,7 @@ class ItemFields(BaseModel):
 
 
 class ItemCreate(ItemFields):
+    id: uuid.UUID | None = None  # klient může zvolit ID (offline zápis); opakování je idempotentní
     tags: list[str] = Field(default_factory=list)
     placements: list[PlacementIn] = Field(default_factory=list)
 
@@ -476,3 +478,94 @@ class FileOrder(BaseModel):
     """Nové pořadí vazeb (ID vazeb od prvního). Nevyjmenované vazby zůstanou za nimi."""
 
     link_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+
+
+# --- Štítky a skenování ---------------------------------------------------------------------
+
+
+class ResolveOut(BaseModel):
+    """Výsledek rozlišení naskenovaného kódu."""
+
+    type: Literal["item", "location"]
+    id: uuid.UUID
+    name: str
+    label_code: str
+    full_name: str | None = None  # umístění: celá cesta; věc: cesta jejího (prvního) umístění
+    deleted: bool = False  # věc v koši / archivované umístění
+
+
+# --- Inventura ------------------------------------------------------------------------------
+
+InventoryResult = Literal["unchecked", "ok", "missing", "extra", "moved"]
+InventoryStatus = Literal["open", "closed", "cancelled"]
+
+
+class InventoryStart(BaseModel):
+    location_id: uuid.UUID | None = None  # rozsah (podstrom); None = celý dům
+    name: str | None = Field(default=None, max_length=200)
+
+
+class InventoryCounts(BaseModel):
+    total: int = 0
+    unchecked: int = 0
+    ok: int = 0
+    missing: int = 0
+    extra: int = 0
+    moved: int = 0
+    changes: int = 0  # kolik řádků by uzavření s aplikací změnilo v datech
+
+
+class InventorySessionOut(BaseModel):
+    id: uuid.UUID
+    location_id: uuid.UUID | None
+    location_name: str | None = None
+    name: str
+    status: InventoryStatus
+    started_by: uuid.UUID | None
+    started_at: datetime
+    closed_at: datetime | None
+    applied_at: datetime | None
+    counts: InventoryCounts = Field(default_factory=InventoryCounts)
+
+
+class InventoryLineOut(BaseModel):
+    item_id: uuid.UUID
+    item_name: str
+    item_label_code: str
+    unit: str
+    location_id: uuid.UUID
+    location_name: str | None = None
+    location_path: str | None = None
+    expected_qty: Decimal | None
+    counted_qty: Decimal | None
+    result: InventoryResult
+    counted_at: datetime | None
+    diff: Decimal | None = None  # counted − expected (None, dokud se nepočítalo)
+
+
+class InventorySessionDetail(InventorySessionOut):
+    lines: list[InventoryLineOut] = Field(default_factory=list)
+
+
+class InventoryCountIn(BaseModel):
+    """Spočtené množství; ``null`` vrátí řádek do stavu „nezkontrolováno“."""
+
+    counted_qty: Decimal | None = Field(default=None, ge=0)
+
+
+class InventoryCloseIn(BaseModel):
+    apply: bool = False  # True = rozdíly zapsat do dat (množství, last_seen_at)
+
+
+class InventoryChange(BaseModel):
+    item_id: uuid.UUID
+    item_name: str
+    location_id: uuid.UUID
+    from_qty: Decimal
+    to_qty: Decimal
+
+
+class InventoryCloseOut(BaseModel):
+    session: InventorySessionOut
+    applied: bool
+    changes: list[InventoryChange] = Field(default_factory=list)

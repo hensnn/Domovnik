@@ -422,3 +422,34 @@ class PhotoDetection(Base):
     item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("items.id", ondelete="SET NULL"))
     decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class InventorySession(Base):
+    __tablename__ = "inventory_sessions"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    location_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("locations.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, server_default="open")
+    started_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    started_at: Mapped[datetime] = _now()
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class InventoryLine(Base):
+    __tablename__ = "inventory_lines"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("inventory_sessions.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    location_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("locations.id", ondelete="SET NULL"), primary_key=True
+    )
+    expected_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    counted_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    result: Mapped[str] = mapped_column(Text, server_default="unchecked")
+    counted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

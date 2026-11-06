@@ -161,10 +161,17 @@ def _movement(
 
 
 def create_item(db: Session, ctx: ActorContext, data: ItemCreate) -> Item:
+    """Vytvoří věc. S klientským ``id`` je volání idempotentní (existující věc se vrátí beze změny)."""
+    if data.id is not None:
+        existing = db.get(Item, data.id)
+        if existing is not None:
+            return existing
     values = {f: getattr(data, f) for f in _PLAIN_FIELDS}
     _validate_refs(db, values)
     values["name"] = values["name"].strip()
     item = Item(**values, created_by=ctx.actor_id, updated_by=ctx.actor_id)
+    if data.id is not None:
+        item.id = data.id
     db.add(item)
     flush(db)
     db.refresh(item)

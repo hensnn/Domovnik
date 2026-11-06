@@ -30,8 +30,14 @@ def _require_active_parent(db: Session, parent_id: uuid.UUID | None) -> Location
 
 
 def create_location(db: Session, ctx: ActorContext, data: LocationCreate) -> Location:
+    """Vytvoří umístění. S klientským ``id`` je volání idempotentní (existující se vrátí)."""
+    if data.id is not None:
+        existing = db.get(Location, data.id)
+        if existing is not None:
+            return existing
     _require_active_parent(db, data.parent_id)
     loc = Location(
+        **({"id": data.id} if data.id is not None else {}),
         parent_id=data.parent_id,
         kind=data.kind,
         name=data.name.strip(),

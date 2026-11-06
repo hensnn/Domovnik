@@ -2,11 +2,13 @@ import clsx from "clsx";
 import {
   Boxes,
   Camera,
+  ClipboardCheck,
   FolderTree,
   LayoutDashboard,
   LogOut,
   MoreHorizontal,
   Package,
+  ScanLine,
   Search,
   Settings as SettingsIcon,
   Sparkles,
@@ -14,10 +16,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../features/auth/AuthProvider";
 import CommandPalette from "./CommandPalette";
+import CurrentLocationChip from "./CurrentLocationChip";
+import OfflineBanner from "./OfflineBanner";
 import { IconButton, Modal } from "./ui";
 import { useLiveUpdates } from "./useLiveUpdates";
 import { useThemeSetting } from "./useTheme";
@@ -35,6 +39,11 @@ const NAV = [
 const MOBILE_MAIN = [NAV[0], NAV[1]] as const;
 const MOBILE_AFTER = [NAV[2]] as const;
 const MOBILE_MORE = [NAV[3], NAV[4], NAV[5]] as const;
+/** Další položky jen v postranním menu na desktopu (na mobilu: tlačítko Skenovat v hlavičce a přehled). */
+const EXTRA_NAV = [
+  { to: "/scan", key: "scan.nav", icon: ScanLine },
+  { to: "/inventory", key: "inventory.nav", icon: ClipboardCheck },
+] as const;
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -80,6 +89,22 @@ export default function Layout() {
               <Icon className="size-5" /> {t(key)}
             </NavLink>
           ))}
+          {EXTRA_NAV.map(({ to, key, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                clsx(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                  isActive
+                    ? "bg-brand-50 text-brand-700 dark:bg-brand-700/20 dark:text-brand-100"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                )
+              }
+            >
+              <Icon className="size-5" /> {t(key)}
+            </NavLink>
+          ))}
         </nav>
         <div className="border-t border-slate-200 p-3 text-sm dark:border-slate-800">
           <div className="truncate font-medium">{me.user.display_name}</div>
@@ -94,7 +119,8 @@ export default function Layout() {
       </aside>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+        <OfflineBanner />
+        <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
           <span className="flex items-center gap-1 font-bold text-brand-600 md:hidden">
             <Boxes className="size-5" />
           </span>
@@ -109,6 +135,17 @@ export default function Layout() {
               Ctrl K
             </kbd>
           </button>
+          <Link
+            to="/scan"
+            aria-label={t("scan.title")}
+            title={t("scan.title")}
+            className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-700 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <ScanLine className="size-5" />
+          </Link>
+          <div className="order-last basis-full md:order-none md:basis-auto">
+            <CurrentLocationChip />
+          </div>
           <IconButton label={t("auth.logout")} className="md:hidden" onClick={() => void logout()}>
             <LogOut className="size-5" />
           </IconButton>

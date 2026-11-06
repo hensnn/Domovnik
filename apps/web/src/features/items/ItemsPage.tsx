@@ -46,6 +46,7 @@ import {
 import { STATUS_TONE, formatDate, formatQty, placementSummary } from "../../lib/format";
 import { useStoredState } from "../../lib/storage";
 import { useAuth } from "../auth/AuthProvider";
+import PrintLabelsDialog from "../labels/PrintLabelsDialog";
 import ItemDetail from "./ItemDetail";
 import ItemForm from "./ItemForm";
 
@@ -125,6 +126,7 @@ export default function ItemsPage() {
   const [creating, setCreating] = useState(params.get("new") === "1");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
 
   // hledání s krátkým zpožděním
   const [qText, setQText] = useState(filters.q ?? "");
@@ -412,11 +414,16 @@ export default function ItemsPage() {
         </Card>
       )}
 
-      {selected.size > 0 && canWrite && (
+      {selected.size > 0 && (
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-lg bg-brand-600 p-2 text-sm text-white shadow">
           <span className="px-2 font-medium">{t("items.selected", { count: selected.size })}</span>
-          <Button size="sm" onClick={() => setBulkOpen(true)}>
-            {t("items.bulk.actions")}
+          {canWrite && (
+            <Button size="sm" onClick={() => setBulkOpen(true)}>
+              {t("items.bulk.actions")}
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setPrintOpen(true)}>
+            {t("labels.printSelected")}
           </Button>
           <Button
             size="sm"
@@ -588,6 +595,13 @@ export default function ItemsPage() {
           }}
         />
       </Modal>
+
+      <PrintLabelsDialog
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        kind="item"
+        ids={[...selected]}
+      />
 
       <BulkDialog
         open={bulkOpen}

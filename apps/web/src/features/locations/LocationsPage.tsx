@@ -9,6 +9,7 @@ import {
   FolderPlus,
   Package,
   Plus,
+  Printer,
   Trash2,
 } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
@@ -37,6 +38,7 @@ import {
 import { type TreeNode, buildTree, formatQty, placementSummary } from "../../lib/format";
 import { useAuth } from "../auth/AuthProvider";
 import FileGallery from "../files/FileGallery";
+import PrintLabelsDialog from "../labels/PrintLabelsDialog";
 
 const KINDS: LocationKind[] = [
   "building",
@@ -193,7 +195,10 @@ function LocationDetail({
   const { can } = useAuth();
   const canWrite = can("items:write");
   const items = useItems({ location_id: loc.id, limit: 200, sort: "name" });
+  const { data: allLocations } = useLocations(true);
   const [error, setError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const childIds = useMemo(() => descendantIds(allLocations ?? [], loc.id), [allLocations, loc.id]);
 
   const archive = useApiMutation(() =>
     loc.archived_at ? api_.unarchiveLocation(loc.id) : api_.archiveLocation(loc.id),
@@ -235,6 +240,11 @@ function LocationDetail({
         <p className="text-sm text-slate-500">
           {t("locations.itemCount", { count: loc.item_count, direct: loc.direct_item_count })}
         </p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setPrinting(true)}>
+            <Printer className="size-4" /> {t("labels.printOne")}
+          </Button>
+        </div>
         {canWrite && (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={onEdit}>
@@ -311,8 +321,29 @@ function LocationDetail({
           <p className="p-4 text-sm text-slate-500">{t("locations.emptyContents")}</p>
         )}
       </Card>
+      <PrintLabelsDialog
+        open={printing}
+        onClose={() => setPrinting(false)}
+        kind="location"
+        ids={[loc.id]}
+        extraIds={childIds}
+        extraLabel={t("labels.includeChildren", { count: childIds.length })}
+      />
     </div>
   );
+}
+
+/** ID všech podřízených umístění (v pořadí průchodu stromem). */
+function descendantIds(all: Location[], rootId: string): string[] {
+  const out: string[] = [];
+  const known = new Set([rootId]);
+  for (const l of all) {
+    if (l.parent_id && known.has(l.parent_id)) {
+      known.add(l.id);
+      out.push(l.id);
+    }
+  }
+  return out;
 }
 
 function LocationFormModal({

@@ -1,4 +1,13 @@
-import { ArrowRightLeft, Edit3, MapPin, Minus, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Edit3,
+  MapPin,
+  Minus,
+  Plus,
+  Printer,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +27,7 @@ import {
 } from "../../components/ui";
 import { STATUS_TONE, formatDate, formatDateTime, formatMoney, formatQty } from "../../lib/format";
 import { useAuth } from "../auth/AuthProvider";
+import PrintLabelsDialog from "../labels/PrintLabelsDialog";
 import ItemForm from "./ItemForm";
 
 export default function ItemDetail({ id, onClose }: { id: string; onClose: () => void }) {
@@ -27,6 +37,7 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
   const { data: item, isPending, isError, error } = useItem(id);
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<"info" | "history">("info");
+  const [printing, setPrinting] = useState(false);
   const [dialog, setDialog] = useState<null | {
     kind: "move" | "adjust" | "remove" | "add";
     placement?: Placement;
@@ -69,6 +80,11 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
             {formatQty(item.total_quantity, item.unit)}
           </strong>
         </p>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setPrinting(true)}>
+            <Printer className="size-4" /> {t("labels.printOne")}
+          </Button>
+        </div>
         {canWrite && (
           <div className="flex flex-wrap gap-2">
             {item.deleted_at ? (
@@ -171,6 +187,12 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
       )}
 
       {dialog && <PlacementDialog item={item} dialog={dialog} onClose={() => setDialog(null)} />}
+      <PrintLabelsDialog
+        open={printing}
+        onClose={() => setPrinting(false)}
+        kind="item"
+        ids={[item.id]}
+      />
     </div>
   );
 }

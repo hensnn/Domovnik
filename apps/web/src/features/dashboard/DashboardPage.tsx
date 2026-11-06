@@ -1,9 +1,11 @@
 import {
   AlertTriangle,
   Camera,
+  ClipboardCheck,
   FolderTree,
   HelpCircle,
   Package,
+  ScanLine,
   ShieldAlert,
   Sparkles,
   Tags,
@@ -54,6 +56,21 @@ export default function DashboardPage() {
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
         >
           <Sparkles className="size-4" /> {t("nav.assistant")}
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          to="/scan"
+          className="flex items-center gap-3 rounded-xl bg-brand-600 p-4 font-semibold text-white hover:bg-brand-700"
+        >
+          <ScanLine className="size-6" /> {t("scan.title")}
+        </Link>
+        <Link
+          to="/inventory"
+          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 font-semibold hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          <ClipboardCheck className="size-6 text-brand-600" /> {t("inventory.nav")}
         </Link>
       </div>
 

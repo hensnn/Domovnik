@@ -4,6 +4,7 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import { get, post, setCsrfToken, setUnauthorizedHandler } from "../../api/client";
 import type { AuthStatus, Me } from "../../api/types";
 import { Spinner } from "../../components/ui";
+import { clearOfflineData, isNetworkError, recallMe, rememberMe } from "../../lib/offlineCache";
 import LoginPage from "./LoginPage";
 import SetupPage from "./SetupPage";
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       const m = await get<Me>("/auth/me");
       setCsrfToken(m.csrf_token);
+      rememberMe(m);
       return m;
     },
     enabled: authenticated,
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => {
     setCsrfToken(null);
+    void clearOfflineData(); // po odhlášení / vypršení relace nezůstávají data pro offline
     // data starého přihlášení zahodit, stav přihlášení znovu načíst
     qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "auth" });
     void qc.invalidateQueries({ queryKey: ["auth"] });
@@ -58,25 +61,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     reset();
   }, [reset]);
 
+  // Bez spojení se aplikace otevře s naposledy známým uživatelem a daty uloženými service workerem.
+  const offlineMe = useMemo(
+    () => (status.isError && isNetworkError(status.error) ? recallMe() : null),
+    [status.isError, status.error],
+  );
+  const effectiveMe = me.data ?? offlineMe;
+
   const value = useMemo<AuthValue | null>(() => {
-    if (!me.data) return null;
-    const scopes = new Set(me.data.scopes);
+    if (!effectiveMe) return null;
+    const scopes = new Set(effectiveMe.scopes);
     return {
-      me: me.data,
-      isAdmin: me.data.user.role === "admin",
+      me: effectiveMe,
+      isAdmin: effectiveMe.user.role === "admin",
       can: (s) => scopes.has(s) || scopes.has("admin"),
       logout,
     };
-  }, [me.data, logout]);
+  }, [effectiveMe, logout]);
 
   if (status.isPending) return <Spinner label="Načítám…" />;
-  if (status.isError) {
+  if (offlineMe && value) {
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  }
+  if (status.isError && !status.data) {
     return (
       <div className="p-6" role="alert">
         API není dostupné. Zkontroluj, že server běží.
       </div>
     );
   }
+  if (!status.data) return <Spinner label="Načítám…" />;
   if (status.data.setup_required) return <SetupPage onDone={reset} />;
   if (!authenticated) return <LoginPage onDone={reset} />;
   if (!value) return <Spinner label="Načítám…" />;
