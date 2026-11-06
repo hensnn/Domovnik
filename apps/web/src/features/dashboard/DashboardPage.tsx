@@ -1,9 +1,11 @@
 import {
   AlertTriangle,
+  Camera,
   FolderTree,
   HelpCircle,
   Package,
   ShieldAlert,
+  Sparkles,
   Tags,
   Timer,
   Trash2,
@@ -20,7 +22,7 @@ import { useAuth } from "../auth/AuthProvider";
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const { me } = useAuth();
+  const { me, can } = useAuth();
   const { data, isPending, isError, error } = useDashboard();
   const { data: locs = [] } = useLocations(true);
   if (isPending) return <Spinner />;
@@ -35,7 +37,25 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-3 md:p-5">
-      <h1 className="text-xl font-bold">{t("dashboard.hello", { name: me.user.display_name })}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="mr-auto text-xl font-bold">
+          {t("dashboard.hello", { name: me.user.display_name })}
+        </h1>
+        {can("items:write") && (
+          <Link
+            to="/add-photo"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            <Camera className="size-4" /> {t("nav.addPhoto")}
+          </Link>
+        )}
+        <Link
+          to="/assistant"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          <Sparkles className="size-4" /> {t("nav.assistant")}
+        </Link>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat to="/items" icon={<Package />} label={t("dashboard.items")} value={c.items} />
