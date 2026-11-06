@@ -16,6 +16,7 @@ Z kořene repa (vyžaduje `pnpm`, `uv`, Docker; `uv` na Windows bývá v `%APPDA
 - `pnpm lint` / `pnpm test` / `pnpm build` – kontroly (api: ruff, mypy, pytest; web: eslint, tsc, prettier, vitest)
 - `pnpm test:api` s `DATABASE_URL` v prostředí spustí i integrační testy proti DB
 - Lokální konfigurace: zkopíruj `.env.example` → `.env` (necommituje se)
+- Soubory (F4): úložiště je `FILES_DIR` (výchozí `./data/files`); `uv run domovnik files-gc --hours 24` smaže nepoužité soubory; rozhodnutí v `docs/adr/0001-uloziste-souboru.md`
 
 Poznámky: TypeScript je připnutý na `~5.9`, protože `typescript-eslint` zatím nepodporuje TS 7. `just` se nepoužívá (nahrazují ho skripty v kořenovém `package.json`).
 
