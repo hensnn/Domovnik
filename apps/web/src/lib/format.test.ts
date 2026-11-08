@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTree, flattenTree, formatQty } from "./format";
+import { buildTree, flattenTree, formatQty, subtreeIds } from "./format";
 
 describe("formatQty", () => {
   it("formátuje celá i desetinná čísla a jednotku", () => {
@@ -21,6 +21,10 @@ describe("buildTree / flattenTree", () => {
     const tree = buildTree(list);
     expect(tree.map((n) => n.node.id)).toEqual(["a", "d"]);
     expect(tree[0].children[0].children[0].node.id).toBe("c");
+  });
+  it("najde podstrom i při obráceném pořadí seznamu", () => {
+    expect([...subtreeIds([...list].reverse(), "a")].sort()).toEqual(["a", "b", "c"]);
+    expect([...subtreeIds(list, "d")]).toEqual(["d"]);
   });
   it("zploští strom s hloubkou", () => {
     expect(flattenTree(list).map((x) => [x.node.id, x.depth])).toEqual([

@@ -349,6 +349,12 @@
   },
   "locations": {
     "add": "Přidat umístění",
+    "dragHint": "Umístění můžeš přetáhnout na jiné a tím ho do něj přesunout.",
+    "dropRoot": "Pusť sem pro přesun na nejvyšší úroveň",
+    "move": "Přesunout",
+    "moveTitle": "Přesunout „{{name}}“",
+    "moveTo": "Nové nadřazené umístění",
+    "moved": "Umístění přesunuto",
     "addChild": "Podřízené umístění",
     "addItem": "Přidat věc sem",
     "edit": "Upravit umístění",

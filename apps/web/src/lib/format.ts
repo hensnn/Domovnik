@@ -78,6 +78,31 @@ export function buildTree<T extends { id: string; parent_id: string | null }>(
   return roots;
 }
 
+/** ID uzlu a všech jeho potomků (nezávisle na pořadí v seznamu). */
+export function subtreeIds<T extends { id: string; parent_id: string | null }>(
+  list: T[],
+  rootId: string,
+): Set<string> {
+  const childrenOf = new Map<string, string[]>();
+  for (const n of list) {
+    if (!n.parent_id) continue;
+    const arr = childrenOf.get(n.parent_id) ?? [];
+    arr.push(n.id);
+    childrenOf.set(n.parent_id, arr);
+  }
+  const out = new Set<string>([rootId]);
+  const stack = [rootId];
+  while (stack.length) {
+    for (const c of childrenOf.get(stack.pop()!) ?? []) {
+      if (!out.has(c)) {
+        out.add(c);
+        stack.push(c);
+      }
+    }
+  }
+  return out;
+}
+
 /** Zploštěný strom s hloubkou – pro výběry (select) s odsazením. */
 export function flattenTree<T extends { id: string; parent_id: string | null }>(
   list: T[],
