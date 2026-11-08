@@ -14,6 +14,7 @@ from domovnik.schemas import (
     CategoryMerge,
     CategoryOut,
     CategoryUpdate,
+    DuplicateRequest,
     LocationCreate,
     LocationOut,
     LocationUpdate,
@@ -83,6 +84,23 @@ def unarchive_location(location_id: uuid.UUID, rc: RequestCtx = Depends(deps.wri
     return location_service.get_location_out(rc.db, location_id)
 
 
+@router.post("/locations/{location_id}/duplicate", response_model=LocationOut, status_code=201)
+def duplicate_location(
+    location_id: uuid.UUID,
+    response: Response,
+    body: DuplicateRequest | None = None,
+    rc: RequestCtx = Depends(deps.write),
+) -> LocationOut:
+    """Zkopíruje umístění vedle původního (volitelně i podřízená; věci a fotky ne)."""
+    body = body or DuplicateRequest()
+    root, created = location_service.duplicate_location(
+        rc.db, rc.ctx, location_id, name=body.name, include_children=body.include_children
+    )
+    rc.commit()
+    response.headers["X-Created-Count"] = str(created)
+    return location_service.get_location_out(rc.db, root.id)
+
+
 @router.delete("/locations/{location_id}", status_code=204)
 def delete_location(location_id: uuid.UUID, rc: RequestCtx = Depends(deps.write)) -> None:
     location_service.delete_location(rc.db, rc.ctx, location_id)
@@ -126,6 +144,23 @@ def update_category(
     category_service.update_category(rc.db, rc.ctx, category_id, body)
     rc.commit()
     return _category_out(rc, category_id)
+
+
+@router.post("/categories/{category_id}/duplicate", response_model=CategoryOut, status_code=201)
+def duplicate_category(
+    category_id: uuid.UUID,
+    response: Response,
+    body: DuplicateRequest | None = None,
+    rc: RequestCtx = Depends(deps.write),
+) -> CategoryOut:
+    """Zkopíruje kategorii vedle původní (volitelně i podkategorie; věci se nekopírují)."""
+    body = body or DuplicateRequest()
+    root, created = category_service.duplicate_category(
+        rc.db, rc.ctx, category_id, name=body.name, include_children=body.include_children
+    )
+    rc.commit()
+    response.headers["X-Created-Count"] = str(created)
+    return _category_out(rc, root.id)
 
 
 @router.post("/categories/{category_id}/merge", response_model=CategoryOut)

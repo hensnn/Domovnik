@@ -18,7 +18,10 @@ Vše je sloučené ve větvi **`feat/integrace`** (obsahuje všechny níže uved
 | + | **Knihovna znalostí AI** (`/knowledge`, tabulka `ai_knowledge`, migrace 0006): pravidla uspořádání a zvyky domácnosti spravuje admin, AI je dostává v promptu (limit `ai.knowledge_max_chars`) a zbytek hledá nástrojem `search_knowledge`; AI nové pravidlo jen navrhne (`add_knowledge`, vždy s potvrzením, od ne-admina vypnuté do schválení) |
 | + | Výchozí umístění z „Jsem tady“: nová věc / přesun bez uvedeného místa použije tuto pozici, asistent se neptá (jen výslovné jiné místo má přednost; věc bez místa jen s `unplaced`) |
 
-Testy: backend 171, web 94 (vše zelené, lint a typy také).
+| + | Instalace do telefonu (PWA): tlačítko „Nainstalovat aplikaci“ (postranní menu, Více), pruh na telefonu, návod pro Android / iPhone / počítač; vyžaduje HTTPS s důvěryhodným certifikátem |
+| + | Duplikování věcí (předvyplněný formulář), umístění a kategorií (`POST /locations/{id}/duplicate`, `POST /categories/{id}/duplicate`; kopíruje se struktura, ne věci a fotky) |
+
+Testy: backend 174, web 107 (vše zelené, lint a typy také).
 
 ## Jak to spustit (vývoj)
 ```bash

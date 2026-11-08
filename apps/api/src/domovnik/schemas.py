@@ -379,6 +379,13 @@ class TagMerge(BaseModel):
     target_id: uuid.UUID
 
 
+class DuplicateRequest(BaseModel):
+    """Duplikace umístění / kategorie: kopíruje se struktura (ne věci a fotky)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    include_children: bool = True
+
+
 # --- Knihovna znalostí pro AI -----------------------------------------------------------------
 
 KnowledgeTopic = Literal["household", "rules", "naming", "other"]

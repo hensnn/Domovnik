@@ -179,6 +179,10 @@ export const api_ = {
     post<Category>(`/categories/${id}/merge`, { target_id: targetId }),
   deleteCategory: (id: string, reassignTo?: string) =>
     del<void>(`/categories/${id}`, { reassign_to: reassignTo }),
+  duplicateLocation: (id: string, body: { name?: string; include_children: boolean }) =>
+    post<Location>(`/locations/${id}/duplicate`, body),
+  duplicateCategory: (id: string, body: { name?: string; include_children: boolean }) =>
+    post<Category>(`/categories/${id}/duplicate`, body),
   createKnowledge: (body: {
     title: string;
     content: string;

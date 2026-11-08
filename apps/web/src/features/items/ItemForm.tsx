@@ -48,6 +48,11 @@ interface FormState {
   quantity: string;
 }
 
+/** Kopie věci pro duplikaci: bez sériového čísla a EAN (jsou jedinečné), název s „(kopie)“. */
+function asCopy(src: Item, suffix: string): Item {
+  return { ...src, name: `${src.name} ${suffix}`, serial_no: null, ean: null };
+}
+
 function initial(
   item?: Item,
   presetLocation?: string | null,
@@ -86,12 +91,15 @@ const orNull = (s: string) => (s.trim() === "" ? null : s.trim());
 /** Formulář pro vytvoření i úpravu věci. */
 export default function ItemForm({
   item,
+  copyFrom,
   presetLocation,
   presetCategory,
   onDone,
   onCancel,
 }: {
   item?: Item;
+  /** Duplikace: formulář se předvyplní z této věci, uloží se jako nová (fotky se nekopírují). */
+  copyFrom?: Item;
   presetLocation?: string | null;
   presetCategory?: string | null;
   onDone: (saved: Item) => void;
@@ -101,9 +109,15 @@ export default function ItemForm({
   const toast = useToast();
   const [here] = useCurrentLocation(); // „Jsem tady“ = výchozí umístění nové věci
   const [f, setF] = useState<FormState>(() =>
-    initial(item, presetLocation ?? (item ? null : here), presetCategory),
+    copyFrom
+      ? initial(
+          asCopy(copyFrom, t("items.copySuffix")),
+          presetLocation ?? copyFrom.placements[0]?.location_id ?? null,
+          presetCategory,
+        )
+      : initial(item, presetLocation ?? (item ? null : here), presetCategory),
   );
-  const [more, setMore] = useState(!!item);
+  const [more, setMore] = useState(!!item || !!copyFrom);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
 

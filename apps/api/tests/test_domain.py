@@ -289,3 +289,71 @@ def test_locations_listed_depth_first_sorted_by_name(db: Session, ctx: ActorCont
         "Sklep",
         "Zahrada",
     ]
+
+
+# --- duplikace umístění a kategorií --------------------------------------------------------------
+
+
+def test_duplicate_location_copies_structure_not_items(db: Session, ctx: ActorContext) -> None:
+    from domovnik.services import locations as loc_service
+
+    dum = loc_service.get_or_create_path(db, ctx, ["Dům"])
+    regal = loc_service.create_location(
+        db,
+        ctx,
+        LocationCreate(
+            name="Regál A", parent_id=dum.id, kind="furniture", notes="vlevo", description="d"
+        ),
+    )
+    p1 = loc_service.create_location(
+        db, ctx, LocationCreate(name="Police 1", parent_id=regal.id, kind="shelf")
+    )
+    loc_service.create_location(
+        db, ctx, LocationCreate(name="Police 2", parent_id=regal.id, kind="shelf")
+    )
+    old = loc_service.create_location(
+        db, ctx, LocationCreate(name="Stará", parent_id=regal.id, kind="shelf")
+    )
+    loc_service.archive_location(db, ctx, old.id)
+    items.create_item(
+        db, ctx, ItemCreate(name="Kladivo", placements=[PlacementIn(location_id=p1.id)])
+    )
+
+    copy, created = loc_service.duplicate_location(db, ctx, regal.id)
+    assert created == 3 and copy.name == "Regál A (kopie)" and copy.parent_id == dum.id
+    assert (
+        copy.kind == "furniture" and copy.notes == "vlevo" and copy.label_code != regal.label_code
+    )
+    kids = [x.name for x in loc_service.list_locations(db) if x.parent_id == copy.id]
+    assert sorted(kids) == ["Police 1", "Police 2"]  # archivovaná se nekopíruje
+    by_name = {x.name: x for x in loc_service.list_locations(db) if x.parent_id == copy.id}
+    assert by_name["Police 1"].item_count == 0  # věci zůstaly jen v originále
+    assert {x.kind for x in by_name.values()} == {"shelf"}
+
+    # druhá kopie dostane další volný název; vlastní název a konflikt
+    again, _ = loc_service.duplicate_location(db, ctx, regal.id, include_children=False)
+    assert again.name == "Regál A (kopie 2)"
+    assert [x for x in loc_service.list_locations(db) if x.parent_id == again.id] == []
+    named, n = loc_service.duplicate_location(db, ctx, regal.id, name="Regál B")
+    assert named.name == "Regál B" and n == 3
+    with pytest.raises(Conflict):
+        loc_service.duplicate_location(db, ctx, regal.id, name="regál b")
+
+
+def test_duplicate_category_copies_subcategories(db: Session, ctx: ActorContext) -> None:
+    root = categories.create_category(db, ctx, CategoryCreate(name="Elektro", description="E"))
+    kabely = categories.create_category(db, ctx, CategoryCreate(name="Kabely", parent_id=root.id))
+    categories.create_category(db, ctx, CategoryCreate(name="USB", parent_id=kabely.id))
+    items.create_item(db, ctx, ItemCreate(name="Kabel", category_id=kabely.id))
+
+    copy, created = categories.duplicate_category(db, ctx, root.id)
+    assert created == 3 and copy.name == "Elektro (kopie)" and copy.description == "E"
+    tree = {c.full_name: c for c in categories.list_categories(db)}
+    assert "Elektro (kopie) › Kabely › USB" in tree
+    assert tree["Elektro (kopie) › Kabely"].item_count == 0  # věci se nekopírují
+    assert tree["Elektro › Kabely"].item_count == 1
+
+    flat, n = categories.duplicate_category(db, ctx, root.id, include_children=False)
+    assert n == 1 and flat.name == "Elektro (kopie 2)"
+    with pytest.raises(Conflict):
+        categories.duplicate_category(db, ctx, root.id, name="Elektro")

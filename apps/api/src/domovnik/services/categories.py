@@ -42,6 +42,79 @@ def create_category(db: Session, ctx: ActorContext, data: CategoryCreate) -> Cat
     return cat
 
 
+MAX_DUPLICATE_NODES = 500
+
+
+def duplicate_category(
+    db: Session,
+    ctx: ActorContext,
+    category_id: uuid.UUID,
+    *,
+    name: str | None = None,
+    include_children: bool = True,
+) -> tuple[Category, int]:
+    """Zkopíruje kategorii (vedle původní) a volitelně všechny podkategorie. Věci se nekopírují."""
+    src = get_or_404(db, Category, category_id, what="Kategorie")
+    taken = {
+        n.lower()
+        for n in db.execute(select(Category.name).where(Category.parent_id == src.parent_id))
+        .scalars()
+        .all()
+    }
+    if name is not None and name.strip().lower() in taken:
+        raise Conflict(f"Kategorie „{name.strip()}“ už na stejné úrovni existuje.")
+    if name:
+        new_name = name.strip()
+    else:
+        new_name, n = f"{src.name} (kopie)", 2
+        while new_name.lower() in taken:
+            new_name, n = f"{src.name} (kopie {n})", n + 1
+
+    created = 0
+
+    def copy(node: Category, parent_id: uuid.UUID | None, node_name: str) -> Category:
+        nonlocal created
+        if created >= MAX_DUPLICATE_NODES:
+            raise Conflict(f"Příliš velký strom ke zkopírování (max. {MAX_DUPLICATE_NODES}).")
+        clone = create_category(
+            db,
+            ctx,
+            CategoryCreate(
+                name=node_name,
+                parent_id=parent_id,
+                description=node.description,
+                color=node.color,
+                icon=node.icon,
+                sort_order=node.sort_order,
+            ),
+        )
+        created += 1
+        if include_children:
+            kids = (
+                db.execute(
+                    select(Category)
+                    .where(Category.parent_id == node.id)
+                    .order_by(Category.sort_order, Category.name)
+                )
+                .scalars()
+                .all()
+            )
+            for kid in kids:
+                copy(kid, clone.id, kid.name)
+        return clone
+
+    root = copy(src, src.parent_id, new_name)
+    emit(
+        db,
+        ctx,
+        "category.duplicated",
+        "category",
+        root.id,
+        {"source": str(src.id), "created": created},
+    )
+    return root, created
+
+
 def _ancestors(db: Session, category_id: uuid.UUID) -> list[uuid.UUID]:
     """Id kategorie a všech jejích předků (od kategorie ke kořeni)."""
     chain: list[uuid.UUID] = []

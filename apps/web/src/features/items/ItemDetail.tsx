@@ -1,5 +1,6 @@
 import {
   ArrowRightLeft,
+  Copy,
   Edit3,
   MapPin,
   Minus,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { api_, useApiMutation, useItem, useItemMovements, useLocations } from "../../api/hooks";
 import type { Item, Placement } from "../../api/types";
@@ -37,6 +39,9 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
   const { can } = useAuth();
   const { data: item, isPending, isError, error } = useItem(id);
   const [editing, setEditing] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const navigate = useNavigate();
+  const { search } = useLocation();
   const [tab, setTab] = useState<"info" | "history">("info");
   const [printing, setPrinting] = useState(false);
   const [dialog, setDialog] = useState<null | {
@@ -62,6 +67,24 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
     return (
       <div className="p-4">
         <ItemForm item={item} onDone={() => setEditing(false)} onCancel={() => setEditing(false)} />
+      </div>
+    );
+  }
+
+  if (copying) {
+    return (
+      <div className="space-y-3 p-4">
+        <p className="rounded-lg bg-slate-100 p-3 text-sm dark:bg-slate-800">
+          {t("items.copyHint")}
+        </p>
+        <ItemForm
+          copyFrom={item}
+          onDone={(saved) => {
+            setCopying(false);
+            navigate(`/items/${saved.id}${search}`);
+          }}
+          onCancel={() => setCopying(false)}
+        />
       </div>
     );
   }
@@ -96,6 +119,9 @@ export default function ItemDetail({ id, onClose }: { id: string; onClose: () =>
               <>
                 <Button size="sm" onClick={() => setEditing(true)}>
                   <Edit3 className="size-4" /> {t("common.edit")}
+                </Button>
+                <Button size="sm" onClick={() => setCopying(true)}>
+                  <Copy className="size-4" /> {t("common.duplicate")}
                 </Button>
                 <Button size="sm" onClick={() => del.mutate(undefined)} disabled={del.isPending}>
                   <Trash2 className="size-4" /> {t("items.toTrash")}

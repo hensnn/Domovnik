@@ -58,6 +58,90 @@ def create_location(db: Session, ctx: ActorContext, data: LocationCreate) -> Loc
     return loc
 
 
+MAX_DUPLICATE_NODES = 500
+
+
+def _free_copy_name(taken: set[str], name: str) -> str:
+    """„Název (kopie)“, případně „Název (kopie 2)“ … – první, který mezi sourozenci není."""
+    candidate, n = f"{name} (kopie)", 2
+    while candidate.lower() in taken:
+        candidate, n = f"{name} (kopie {n})", n + 1
+    return candidate
+
+
+def duplicate_location(
+    db: Session,
+    ctx: ActorContext,
+    location_id: uuid.UUID,
+    *,
+    name: str | None = None,
+    include_children: bool = True,
+) -> tuple[Location, int]:
+    """Zkopíruje umístění (vedle původního) a volitelně celý podstrom aktivních podřízených.
+
+    Kopíruje se jen struktura (název, druh, popis, poznámky, barva, ikona, atributy); věci,
+    fotky a štítky ne – kopie dostane nové kódy štítků. Vrací (kořen kopie, počet vytvořených).
+    """
+    src = get_or_404(db, Location, location_id, what="Umístění")
+    siblings = {
+        n.lower()
+        for n in db.execute(select(Location.name).where(Location.parent_id == src.parent_id))
+        .scalars()
+        .all()
+    }
+    if name is not None and name.strip().lower() in siblings:
+        raise Conflict(f"Umístění „{name.strip()}“ už na stejné úrovni existuje.")
+    new_name = name.strip() if name else _free_copy_name(siblings, src.name)
+
+    created = 0
+
+    def copy(node: Location, parent_id: uuid.UUID | None, node_name: str) -> Location:
+        nonlocal created
+        if created >= MAX_DUPLICATE_NODES:
+            raise Conflict(f"Příliš velký strom ke zkopírování (max. {MAX_DUPLICATE_NODES}).")
+        clone = create_location(
+            db,
+            ctx,
+            LocationCreate(
+                name=node_name,
+                parent_id=parent_id,
+                kind=node.kind,  # type: ignore[arg-type]
+                description=node.description,
+                notes=node.notes,
+                is_movable=node.is_movable,
+                color=node.color,
+                icon=node.icon,
+                sort_order=node.sort_order,
+                attributes=node.attributes or {},
+            ),
+        )
+        created += 1
+        if include_children:
+            kids = (
+                db.execute(
+                    select(Location)
+                    .where(Location.parent_id == node.id, Location.archived_at.is_(None))
+                    .order_by(Location.sort_order, Location.name)
+                )
+                .scalars()
+                .all()
+            )
+            for kid in kids:
+                copy(kid, clone.id, kid.name)
+        return clone
+
+    root = copy(src, src.parent_id, new_name)
+    emit(
+        db,
+        ctx,
+        "location.duplicated",
+        "location",
+        root.id,
+        {"source": str(src.id), "created": created},
+    )
+    return root, created
+
+
 def update_location(
     db: Session, ctx: ActorContext, location_id: uuid.UUID, data: LocationUpdate
 ) -> Location:

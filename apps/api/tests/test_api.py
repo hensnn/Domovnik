@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Iterator
 from typing import Any
 
@@ -309,3 +310,42 @@ def test_openapi_documents_core_routes(anon: TestClient) -> None:
         "/api/v1/settings",
     ):
         assert path in spec["paths"], path
+
+
+def test_duplicate_endpoints_for_locations_and_categories(client: TestClient) -> None:
+    box = ok(client.post("/api/v1/locations", json={"name": "Skříň", "kind": "furniture"}), 201)
+    ok(
+        client.post(
+            "/api/v1/locations", json={"name": "Police", "kind": "shelf", "parent_id": box["id"]}
+        ),
+        201,
+    )
+    r = client.post(f"/api/v1/locations/{box['id']}/duplicate", json={})
+    assert r.status_code == 201, r.text
+    assert r.headers["X-Created-Count"] == "2"
+    assert r.json()["name"] == "Skříň (kopie)" and r.json()["kind"] == "furniture"
+    bare = ok(client.post(f"/api/v1/locations/{box['id']}/duplicate"), 201)  # i bez těla
+    assert bare["name"] == "Skříň (kopie 2)"
+    only = ok(
+        client.post(
+            f"/api/v1/locations/{box['id']}/duplicate",
+            json={"name": "Jen skříň", "include_children": False},
+        ),
+        201,
+    )
+    assert only["name"] == "Jen skříň"
+    assert (
+        client.post(
+            f"/api/v1/locations/{box['id']}/duplicate", json={"name": "Jen skříň"}
+        ).status_code
+        == 409
+    )
+    assert client.post(f"/api/v1/locations/{uuid.uuid4()}/duplicate", json={}).status_code == 404
+
+    cat = ok(client.post("/api/v1/categories", json={"name": "Nářadí"}), 201)
+    ok(client.post("/api/v1/categories", json={"name": "Ruční", "parent_id": cat["id"]}), 201)
+    dup = client.post(f"/api/v1/categories/{cat['id']}/duplicate", json={})
+    assert dup.status_code == 201 and dup.json()["name"] == "Nářadí (kopie)"
+    assert dup.headers["X-Created-Count"] == "2"
+    names = {c["full_name"] for c in ok(client.get("/api/v1/categories"))}
+    assert "Nářadí (kopie) › Ruční" in names

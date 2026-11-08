@@ -1,12 +1,24 @@
 import clsx from "clsx";
-import { ChevronDown, ChevronRight, Edit3, GitMerge, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Edit3,
+  GitMerge,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { api_, useApiMutation, useCategories, useTags } from "../../api/hooks";
 import type { Category } from "../../api/types";
 import { CategorySelect } from "../../components/Pickers";
+import { DuplicateDialog } from "../../components/DuplicateDialog";
 import { TagBadge } from "../../components/TagBadge";
 import {
   Button,
@@ -32,6 +44,7 @@ export default function CategoriesPage() {
   const tree = useMemo(() => buildTree(data ?? []), [data]);
   const [form, setForm] = useState<null | { edit?: Category; parent?: string | null }>(null);
   const [merge, setMerge] = useState<Category | null>(null);
+  const [dup, setDup] = useState<null | { cat: Category; hasChildren: boolean }>(null);
   const [assistOpen, setAssistOpen] = useState(false);
   const canWrite = can("items:write");
 
@@ -66,6 +79,7 @@ export default function CategoriesPage() {
                 onEdit={(c) => setForm({ edit: c })}
                 onAdd={(p) => setForm({ parent: p })}
                 onMerge={setMerge}
+                onDuplicate={(c, hasChildren) => setDup({ cat: c, hasChildren })}
               />
             ))}
           </ul>
@@ -109,6 +123,13 @@ export default function CategoriesPage() {
         examples={[t("categories.assistEx1"), t("categories.assistEx2"), t("categories.assistEx3")]}
       />
       {merge && <MergeModal source={merge} onClose={() => setMerge(null)} />}
+      {dup && (
+        <DuplicateCategoryDialog
+          cat={dup.cat}
+          hasChildren={dup.hasChildren}
+          onClose={() => setDup(null)}
+        />
+      )}
     </div>
   );
 }
@@ -120,6 +141,7 @@ function Row({
   onEdit,
   onAdd,
   onMerge,
+  onDuplicate,
 }: {
   n: TreeNode<Category>;
   depth: number;
@@ -127,6 +149,7 @@ function Row({
   onEdit: (c: Category) => void;
   onAdd: (parent: string) => void;
   onMerge: (c: Category) => void;
+  onDuplicate: (c: Category, hasChildren: boolean) => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -191,6 +214,15 @@ function Row({
             <Button
               size="sm"
               variant="ghost"
+              aria-label={t("common.duplicate")}
+              title={t("common.duplicate")}
+              onClick={() => onDuplicate(c, has)}
+            >
+              <Copy className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               aria-label={t("categories.merge")}
               title={t("categories.merge")}
               onClick={() => onMerge(c)}
@@ -226,6 +258,7 @@ function Row({
               onEdit={onEdit}
               onAdd={onAdd}
               onMerge={onMerge}
+              onDuplicate={onDuplicate}
             />
           ))}
         </ul>
@@ -395,5 +428,34 @@ function MergeModal({ source, onClose }: { source: Category; onClose: () => void
         )}
       </div>
     </Modal>
+  );
+}
+
+function DuplicateCategoryDialog({
+  cat,
+  hasChildren,
+  onClose,
+}: {
+  cat: Category;
+  hasChildren: boolean;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const qc = useQueryClient();
+  return (
+    <DuplicateDialog
+      title={t("categories.duplicateTitle", { name: cat.name })}
+      sourceName={cat.name}
+      hasChildren={hasChildren}
+      childrenLabel={t("categories.duplicateChildren")}
+      hint={t("categories.duplicateHint")}
+      onClose={onClose}
+      onSubmit={async (body) => {
+        const copy = await api_.duplicateCategory(cat.id, body);
+        void qc.invalidateQueries({ queryKey: ["categories"] });
+        toast(t("duplicate.done", { name: copy.name }));
+      }}
+    />
   );
 }

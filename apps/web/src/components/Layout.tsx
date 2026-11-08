@@ -23,6 +23,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
 import CommandPalette from "./CommandPalette";
 import CurrentLocationChip from "./CurrentLocationChip";
+import { InstallBanner, InstallButton } from "./InstallApp";
 import OfflineBanner from "./OfflineBanner";
 import { IconButton, Modal } from "./ui";
 import { useLiveUpdates } from "./useLiveUpdates";
@@ -110,6 +111,9 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <div className="px-2 pb-2">
+          <InstallButton className="w-full" />
+        </div>
         <div className="border-t border-slate-200 p-3 text-sm dark:border-slate-800">
           <div className="truncate font-medium">{me.user.display_name}</div>
           <div className="mb-2 text-xs text-slate-500">{t(`roles.${me.user.role}`)}</div>
@@ -124,6 +128,7 @@ export default function Layout() {
 
       <div className="flex min-h-0 flex-1 flex-col">
         <OfflineBanner />
+        <InstallBanner />
         <header className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
           <span className="flex items-center gap-1 font-bold text-brand-600 md:hidden">
             <Boxes className="size-5" />
@@ -207,6 +212,9 @@ export default function Layout() {
               </NavLink>
             </li>
           ))}
+          <li className="px-3 pt-2">
+            <InstallButton className="w-full" size="md" onDone={() => setMoreOpen(false)} />
+          </li>
         </ul>
       </Modal>
 

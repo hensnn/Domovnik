@@ -6,6 +6,7 @@ import {
   Camera,
   ChevronRight,
   Edit3,
+  Copy,
   FolderInput,
   Sparkles,
   FolderPlus,
@@ -45,6 +46,7 @@ import {
   placementSummary,
   subtreeIds,
 } from "../../lib/format";
+import { DuplicateDialog } from "../../components/DuplicateDialog";
 import AssistantDrawer from "../assistant/AssistantDrawer";
 import { useAuth } from "../auth/AuthProvider";
 import FileGallery from "../files/FileGallery";
@@ -370,6 +372,7 @@ function LocationDetail({
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const childIds = useMemo(() => descendantIds(allLocations ?? [], loc.id), [allLocations, loc.id]);
 
   const archive = useApiMutation(() =>
@@ -424,6 +427,9 @@ function LocationDetail({
             </Button>
             <Button size="sm" onClick={() => setMoving(true)}>
               <FolderInput className="size-4" /> {t("locations.move")}
+            </Button>
+            <Button size="sm" onClick={() => setDuplicating(true)}>
+              <Copy className="size-4" /> {t("common.duplicate")}
             </Button>
             <Button size="sm" onClick={onAddChild}>
               <FolderPlus className="size-4" /> {t("locations.addChild")}
@@ -497,6 +503,21 @@ function LocationDetail({
         )}
       </Card>
       {moving && <MoveLocationModal loc={loc} onClose={() => setMoving(false)} />}
+      {duplicating && (
+        <DuplicateDialog
+          title={t("locations.duplicateTitle", { name: loc.name })}
+          sourceName={loc.name}
+          hasChildren={childIds.length > 0}
+          childrenLabel={t("locations.duplicateChildren", { count: childIds.length })}
+          hint={t("locations.duplicateHint")}
+          onClose={() => setDuplicating(false)}
+          onSubmit={async (body) => {
+            const copy = await api_.duplicateLocation(loc.id, body);
+            toast(t("duplicate.done", { name: copy.name }));
+            navigate(`/locations/${copy.id}`);
+          }}
+        />
+      )}
       <PrintLabelsDialog
         open={printing}
         onClose={() => setPrinting(false)}

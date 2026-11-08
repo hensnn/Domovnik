@@ -8,6 +8,7 @@ import UpdatePrompt from "./components/UpdatePrompt";
 import { ToastProvider } from "./components/ui";
 import { AuthProvider } from "./features/auth/AuthProvider";
 import "./i18n";
+import "./lib/install"; // zachytí nabídku instalace dřív, než se vykreslí React
 import "./index.css";
 
 // offlineFirst: dotazy se vždy pokusí o síť a při výpadku je obslouží service worker (uložená kopie);
