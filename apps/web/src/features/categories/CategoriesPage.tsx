@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { ChevronDown, ChevronRight, Edit3, GitMerge, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit3, GitMerge, Plus, Sparkles, Trash2 } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -21,6 +21,7 @@ import {
   useToast,
 } from "../../components/ui";
 import { type TreeNode, buildTree } from "../../lib/format";
+import AssistantDrawer from "../assistant/AssistantDrawer";
 import { useAuth } from "../auth/AuthProvider";
 
 export default function CategoriesPage() {
@@ -31,6 +32,7 @@ export default function CategoriesPage() {
   const tree = useMemo(() => buildTree(data ?? []), [data]);
   const [form, setForm] = useState<null | { edit?: Category; parent?: string | null }>(null);
   const [merge, setMerge] = useState<Category | null>(null);
+  const [assistOpen, setAssistOpen] = useState(false);
   const canWrite = can("items:write");
 
   return (
@@ -38,9 +40,14 @@ export default function CategoriesPage() {
       <div className="flex items-center gap-2">
         <h1 className="mr-auto text-xl font-bold">{t("nav.categories")}</h1>
         {canWrite && (
-          <Button variant="primary" size="sm" onClick={() => setForm({ parent: null })}>
-            <Plus className="size-4" /> {t("categories.add")}
-          </Button>
+          <>
+            <Button size="sm" onClick={() => setAssistOpen(true)}>
+              <Sparkles className="size-4" /> {t("nav.assistant")}
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setForm({ parent: null })}>
+              <Plus className="size-4" /> {t("categories.add")}
+            </Button>
+          </>
         )}
       </div>
       <Card className="!p-2">
@@ -85,7 +92,22 @@ export default function CategoriesPage() {
         )}
       </Card>
 
-      {form && <CategoryFormModal {...form} onClose={() => setForm(null)} />}
+      {form && (
+        <CategoryFormModal
+          {...form}
+          onClose={() => setForm(null)}
+          onAssist={() => {
+            setForm(null);
+            setAssistOpen(true);
+          }}
+        />
+      )}
+      <AssistantDrawer
+        open={assistOpen}
+        onClose={() => setAssistOpen(false)}
+        hint={t("categories.assistHint")}
+        examples={[t("categories.assistEx1"), t("categories.assistEx2"), t("categories.assistEx3")]}
+      />
       {merge && <MergeModal source={merge} onClose={() => setMerge(null)} />}
     </div>
   );
@@ -216,9 +238,12 @@ function CategoryFormModal({
   edit,
   parent,
   onClose,
+  onAssist,
 }: {
   edit?: Category;
   parent?: string | null;
+  /** Nabídka „popsat asistentovi“ (jen při vytváření). */
+  onAssist?: () => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -257,6 +282,16 @@ function CategoryFormModal({
   return (
     <Modal open onClose={onClose} title={edit ? t("categories.edit") : t("categories.add")}>
       <form onSubmit={submit} className="space-y-4">
+        {!edit && onAssist && (
+          <button
+            type="button"
+            onClick={onAssist}
+            className="flex w-full items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-left text-sm text-brand-700 hover:bg-brand-100 dark:bg-brand-700/20 dark:text-brand-100"
+          >
+            <Sparkles className="size-4 shrink-0" />
+            <span>{t("categories.assistLink")}</span>
+          </button>
+        )}
         <Field label={t("categories.name")}>
           {(id) => (
             <Input

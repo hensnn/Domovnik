@@ -91,7 +91,20 @@ export function assistantErrorText(err: unknown, t: TFunction): string {
   return errorMessage(err);
 }
 
-export default function AssistantPage() {
+interface AssistantPageProps {
+  /** Vložený do panelu na jiné stránce: bez seznamu konverzací a nadpisu. */
+  embedded?: boolean;
+  /** Vlastní ukázkové zprávy (místo výchozích). */
+  examples?: string[];
+  /** Krátká nápověda nad ukázkami v prázdné konverzaci. */
+  hint?: string;
+}
+
+export default function AssistantPage({
+  embedded = false,
+  examples,
+  hint,
+}: AssistantPageProps = {}) {
   const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
@@ -355,27 +368,43 @@ export default function AssistantPage() {
   );
 
   return (
-    <div className="mx-auto flex h-full max-w-6xl gap-3 p-3 md:p-5">
-      <aside className="hidden w-64 shrink-0 flex-col md:flex" aria-label={t("assistant.history")}>
-        {list}
-      </aside>
+    <div
+      className={clsx(
+        "mx-auto flex h-full gap-3 p-3",
+        embedded ? "max-w-none" : "max-w-6xl md:p-5",
+      )}
+    >
+      {!embedded && (
+        <aside
+          className="hidden w-64 shrink-0 flex-col md:flex"
+          aria-label={t("assistant.history")}
+        >
+          {list}
+        </aside>
+      )}
 
       <section className="flex min-w-0 flex-1 flex-col" aria-label={t("nav.assistant")}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <h1 className="mr-auto text-xl font-bold">{t("nav.assistant")}</h1>
+          {embedded ? (
+            <span className="mr-auto" />
+          ) : (
+            <h1 className="mr-auto text-xl font-bold">{t("nav.assistant")}</h1>
+          )}
           {st && (
             <span className="text-xs text-slate-500">
               {t("assistant.quota", { used: st.requests_today, limit: st.requests_per_day_limit })}
             </span>
           )}
-          <IconButton
-            label={t("assistant.history")}
-            className="md:hidden"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="size-5" />
-          </IconButton>
-          <Button size="sm" className="md:hidden" onClick={newConversation}>
+          {!embedded && (
+            <IconButton
+              label={t("assistant.history")}
+              className="md:hidden"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="size-5" />
+            </IconButton>
+          )}
+          <Button size="sm" className={embedded ? "" : "md:hidden"} onClick={newConversation}>
             <MessageSquarePlus className="size-4" /> {t("assistant.new")}
           </Button>
         </div>
@@ -409,16 +438,20 @@ export default function AssistantPage() {
               <p className="font-medium text-slate-700 dark:text-slate-200">
                 {t("assistant.welcome")}
               </p>
+              {hint && <p className="text-slate-700 dark:text-slate-200">{hint}</p>}
               <p>{t("assistant.welcomeHint")}</p>
               <p>{t("assistant.dictationHint")}</p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
-                {(["ex1", "ex2", "ex3", "ex4"] as const).map((k) => (
+                {(
+                  examples ??
+                  (["ex1", "ex2", "ex3", "ex4"] as const).map((k) => t(`assistant.${k}`))
+                ).map((ex) => (
                   <button
-                    key={k}
-                    onClick={() => setText(t(`assistant.${k}`))}
+                    key={ex}
+                    onClick={() => setText(ex)}
                     className="rounded-full border border-slate-300 px-3 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                   >
-                    {t(`assistant.${k}`)}
+                    {ex}
                   </button>
                 ))}
               </div>

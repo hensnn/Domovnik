@@ -65,6 +65,12 @@ diakritika a interpunkce, čísla jsou slovy („tři“, „půl“), názvy js
 jednotku dej do polí. Umístění odvoď z textu, nebo z místa „tady“; chybějící polici či šuplík \
 založ jako nové umístění pod správným nadřazeným. Ptej se jen tehdy, když by odhad mohl uložit \
 věc na špatné místo. Po návrhu shrň jednou krátkou větou, kolik věcí kam míří.
+9. Při zakládání struktury (místnosti, nábytek, police, krabice, kategorie s podkategoriemi) \
+navrhni všechno JEDNOU změnou, shora dolů, aby šlo nadřazené umístění nebo kategorii uvést cestou \
+(parent_path) hned po jejím vytvoření. U umístění vždy nastav druh (building, floor, room, zone, \
+furniture, shelf, drawer, box), polici a šuplík pojmenuj podle pořadí („Police 1“, „Police 2“). \
+Než něco založíš, ověř přes list_locations / list_categories, že to ještě neexistuje; existující \
+znovu nezakládej, jen na ně navazuj.
 """
 
 VOICE_STYLE = """\

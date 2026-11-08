@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Edit3,
   FolderInput,
+  Sparkles,
   FolderPlus,
   Package,
   Plus,
@@ -44,6 +45,7 @@ import {
   placementSummary,
   subtreeIds,
 } from "../../lib/format";
+import AssistantDrawer from "../assistant/AssistantDrawer";
 import { useAuth } from "../auth/AuthProvider";
 import FileGallery from "../files/FileGallery";
 import PrintLabelsDialog from "../labels/PrintLabelsDialog";
@@ -71,6 +73,7 @@ export default function LocationsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const { data, isPending } = useLocations(showArchived);
   const [form, setForm] = useState<null | { edit?: Location; parent?: string | null }>(null);
+  const [assistOpen, setAssistOpen] = useState(false);
   const tree = useMemo(() => buildTree(data ?? []), [data]);
   const selected = data?.find((l) => l.id === id);
 
@@ -108,9 +111,14 @@ export default function LocationsPage() {
         <div className="mb-3 flex items-center gap-2">
           <h1 className="mr-auto text-xl font-bold">{t("nav.locations")}</h1>
           {can("items:write") && (
-            <Button variant="primary" size="sm" onClick={() => setForm({ parent: null })}>
-              <Plus className="size-4" /> {t("locations.add")}
-            </Button>
+            <>
+              <Button size="sm" onClick={() => setAssistOpen(true)}>
+                <Sparkles className="size-4" /> {t("nav.assistant")}
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setForm({ parent: null })}>
+                <Plus className="size-4" /> {t("locations.add")}
+              </Button>
+            </>
           )}
         </div>
         <Card className="!p-2">
@@ -174,7 +182,22 @@ export default function LocationsPage() {
         )}
       </div>
 
-      {form && <LocationFormModal {...form} onClose={() => setForm(null)} />}
+      {form && (
+        <LocationFormModal
+          {...form}
+          onClose={() => setForm(null)}
+          onAssist={() => {
+            setForm(null);
+            setAssistOpen(true);
+          }}
+        />
+      )}
+      <AssistantDrawer
+        open={assistOpen}
+        onClose={() => setAssistOpen(false)}
+        hint={t("locations.assistHint")}
+        examples={[t("locations.assistEx1"), t("locations.assistEx2"), t("locations.assistEx3")]}
+      />
     </div>
   );
 }
@@ -561,10 +584,13 @@ function LocationFormModal({
   edit,
   parent,
   onClose,
+  onAssist,
 }: {
   edit?: Location;
   parent?: string | null;
   onClose: () => void;
+  /** Nabídka „popsat asistentovi“ (jen při vytváření). */
+  onAssist?: () => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -613,6 +639,16 @@ function LocationFormModal({
   return (
     <Modal open onClose={onClose} title={edit ? t("locations.edit") : t("locations.add")}>
       <form onSubmit={submit} className="space-y-4">
+        {!edit && onAssist && (
+          <button
+            type="button"
+            onClick={onAssist}
+            className="flex w-full items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-left text-sm text-brand-700 hover:bg-brand-100 dark:bg-brand-700/20 dark:text-brand-100"
+          >
+            <Sparkles className="size-4 shrink-0" />
+            <span>{t("locations.assistLink")}</span>
+          </button>
+        )}
         <Field label={t("locations.name")}>
           {(id) => (
             <Input
