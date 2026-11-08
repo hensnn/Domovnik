@@ -17,10 +17,11 @@ from domovnik.api.deps import RequestCtx
 from domovnik.db import get_sessionmaker
 from domovnik.db.models import EventOutbox
 from domovnik.errors import Forbidden
-from domovnik.schemas import AuditOut, SearchOut, SettingUpdate
+from domovnik.schemas import AuditOut, LocationKind, SearchOut, SettingUpdate
 from domovnik.services import search as search_service
 from domovnik.services import settings as settings_service
 from domovnik.services import stats as stats_service
+from domovnik.services.search import SearchScope
 from domovnik.services.settings import SettingOut
 
 router = APIRouter(tags=["system"])
@@ -81,14 +82,29 @@ def _encode(obj: Any) -> Any:
 
 @router.get("/search", response_model=SearchOut)
 def global_search(
-    q: str = Query(min_length=1),
+    q: str = "",
     limit: int = Query(10, ge=1, le=50),
+    scope: SearchScope = "all",
+    kind: list[LocationKind] = Query(default_factory=list),
     rc: RequestCtx = Depends(deps.read),
 ) -> SearchOut:
-    """Rychlé hledání napříč věcmi, umístěními a kategoriemi (Ctrl+K)."""
+    """Rychlé hledání napříč věcmi, umístěními a kategoriemi (Ctrl+K).
+
+    Umístění se najdou i podle druhu („nábytek“, „místnost“…); `kind` zúží umístění na druhy
+    (stačí i bez textu), `scope` omezí hledání na jeden typ.
+    """
+    if not q.strip() and not kind:
+        return SearchOut(items=[], locations=[], categories=[], totals={})
     threshold = float(settings_service.get_value(rc.db, "search.fuzzy_threshold"))
-    res = search_service.search_all(rc.db, q, limit=limit, threshold=threshold)
-    return SearchOut(items=res.items, locations=res.locations, categories=res.categories)
+    res = search_service.search_all(
+        rc.db, q, limit=limit, threshold=threshold, scope=scope, kinds=list(kind)
+    )
+    return SearchOut(
+        items=res.items,
+        locations=res.locations,
+        categories=res.categories,
+        totals=res.totals,
+    )
 
 
 @router.get("/audit", response_model=list[AuditOut])

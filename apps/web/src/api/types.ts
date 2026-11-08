@@ -142,7 +142,11 @@ export interface SearchResults {
   items: Item[];
   locations: Location[];
   categories: Category[];
+  /** počty všech nálezů (před ořezem limitem) */
+  totals: Record<"items" | "locations" | "categories", number>;
 }
+
+export type SearchScope = "all" | "items" | "locations" | "categories";
 
 export interface Dashboard {
   counts: Record<
@@ -201,6 +205,24 @@ export interface ItemFilters {
   unplaced?: boolean;
   low_stock?: boolean;
   trash?: boolean;
+  /** druh umístění (kterýkoli z nich) */
+  location_kind?: LocationKind[];
+  brand?: string;
+  condition?: string;
+  has_photo?: boolean;
+  no_category?: boolean;
+  min_price?: string;
+  max_price?: string;
+  purchased_after?: string;
+  purchased_before?: string;
+  min_qty?: string;
+  max_qty?: string;
+  created_after?: string;
+  updated_after?: string;
+  warranty_before?: string;
+  expires_before?: string;
+  expired?: boolean;
+  warranty_active?: boolean;
   sort?: string;
   desc?: boolean;
   limit?: number;

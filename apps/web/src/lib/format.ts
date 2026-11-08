@@ -1,4 +1,17 @@
-import type { Item, ItemStatus } from "../api/types";
+import type { Item, ItemStatus, LocationKind } from "../api/types";
+
+/** Všechny druhy umístění v pořadí od největšího po nejmenší. */
+export const LOCATION_KINDS: LocationKind[] = [
+  "building",
+  "floor",
+  "room",
+  "zone",
+  "furniture",
+  "shelf",
+  "drawer",
+  "box",
+  "other",
+];
 
 export function formatQty(value: string | number | null | undefined, unit = ""): string {
   if (value === null || value === undefined || value === "") return "–";

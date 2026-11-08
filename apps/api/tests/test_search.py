@@ -156,3 +156,94 @@ def test_global_search_duplicates_and_dashboard(db: Session, ctx: ActorContext) 
     d = stats.dashboard(db)
     assert d["counts"]["items"] == 2 and d["counts"]["unplaced"] == 2
     assert d["counts"]["locations"] == 1 and d["counts"]["categories"] == 1
+
+
+def test_global_search_finds_locations_by_kind(db: Session, ctx: ActorContext) -> None:
+    dum = locations.create_location(db, ctx, LocationCreate(name="Dům", kind="building"))
+    obyvak = locations.create_location(
+        db, ctx, LocationCreate(name="Obývák", kind="room", parent_id=dum.id)
+    )
+    locations.create_location(
+        db, ctx, LocationCreate(name="Skříň TV", kind="furniture", parent_id=obyvak.id)
+    )
+    locations.create_location(
+        db, ctx, LocationCreate(name="Komoda", kind="furniture", parent_id=dum.id)
+    )
+    locations.create_location(
+        db, ctx, LocationCreate(name="Police A", kind="shelf", parent_id=obyvak.id)
+    )
+
+    def locs(q: str, **kw: Any) -> list[str]:
+        return [x.name for x in search.search_all(db, q, **kw).locations]
+
+    assert sorted(locs("nábytek")) == ["Komoda", "Skříň TV"]  # český název druhu
+    assert sorted(locs("nabytek")) == ["Komoda", "Skříň TV"]  # bez diakritiky
+    assert locs("mistnost") == ["Obývák"]
+    assert locs("budova") == ["Dům"]
+    assert locs("police") == ["Police A"]  # název i druh
+    # druh + část názvu: jen nábytek v Obýváku
+    assert locs("nabytek obyvak") == ["Skříň TV"]
+    # filtr druhu zúží výsledek a `scope` omezí typ nálezů
+    assert locs("o", kinds=["room"]) == ["Obývák"]
+    only_locs = search.search_all(db, "komoda", scope="locations")
+    assert only_locs.items == [] and only_locs.totals["locations"] == 1
+    assert search.search_all(db, "nabytek", limit=1).totals["locations"] == 2
+
+
+def test_extended_item_filters(db: Session, ctx: ActorContext) -> None:
+    today = date.today()
+    skrin = locations.create_location(db, ctx, LocationCreate(name="Skříň", kind="furniture"))
+    krabice = locations.create_location(db, ctx, LocationCreate(name="Krabice", kind="box"))
+    items.create_item(
+        db,
+        ctx,
+        ItemCreate(
+            name="Vrtačka",
+            brand="Bosch",
+            condition="good",
+            purchase_price=Decimal("2500"),
+            purchase_date=today - timedelta(days=400),
+            warranty_until=today + timedelta(days=30),
+            placements=[PlacementIn(location_id=skrin.id, quantity=Decimal("1"))],
+        ),
+    )
+    items.create_item(
+        db,
+        ctx,
+        ItemCreate(
+            name="Mléko",
+            brand="Pilos",
+            condition="new",
+            purchase_price=Decimal("25"),
+            expires_at=today - timedelta(days=2),
+            placements=[PlacementIn(location_id=krabice.id, quantity=Decimal("6"))],
+        ),
+    )
+    items.create_item(db, ctx, ItemCreate(name="Bez místa"))
+
+    def f(**kw: Any) -> list[str]:
+        return sorted(names(search.search_items(db, ItemFilter(**kw))))
+
+    assert f(location_kinds=["furniture"]) == ["Vrtačka"]
+    assert f(location_kinds=["furniture", "box"]) == ["Mléko", "Vrtačka"]
+    assert f(brand="bosc") == ["Vrtačka"]
+    assert f(condition="new") == ["Mléko"]
+    assert f(min_price=Decimal("100")) == ["Vrtačka"]
+    assert f(max_price=Decimal("100")) == ["Mléko"]
+    assert f(purchased_before=today - timedelta(days=100)) == ["Vrtačka"]
+    assert f(purchased_after=today - timedelta(days=100)) == []
+    assert f(min_qty=Decimal("2")) == ["Mléko"]
+    assert f(max_qty=Decimal("1")) == ["Bez místa", "Vrtačka"]  # bez umístění = množství 0
+    assert f(expired=True) == ["Mléko"]
+    assert f(warranty_active=True) == ["Vrtačka"]
+    assert f(no_category=True) == ["Bez místa", "Mléko", "Vrtačka"]
+    assert f(has_photo=False) == ["Bez místa", "Mléko", "Vrtačka"]
+    assert f(has_photo=True) == []
+    assert f(created_after=today) == ["Bez místa", "Mléko", "Vrtačka"]
+    assert f(created_after=today + timedelta(days=1)) == []
+    assert f(updated_after=today + timedelta(days=1)) == []
+
+    by_price = search.search_items(db, ItemFilter(sort="price", descending=True))
+    assert names(by_price)[:2] == ["Vrtačka", "Mléko"]
+    by_qty = search.search_items(db, ItemFilter(sort="quantity", descending=True))
+    assert names(by_qty)[0] == "Mléko"

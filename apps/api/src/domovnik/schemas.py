@@ -391,6 +391,7 @@ class SearchOut(BaseModel):
     items: list[ItemOut]
     locations: list[LocationOut]
     categories: list[CategoryOut]
+    totals: dict[str, int] = Field(default_factory=dict)  # počty všech nálezů před ořezem
 
 
 class AuditOut(ORM):

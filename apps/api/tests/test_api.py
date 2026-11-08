@@ -214,6 +214,26 @@ def test_bulk_stats_search_and_settings(client: TestClient) -> None:
     s = ok(client.get("/api/v1/search", params={"q": "krabice"}))
     assert [x["name"] for x in s["locations"]] == ["Krabice"]
 
+    # druh umístění: hledání textem i samotný filtr `kind` (bez textu)
+    ok(client.post("/api/v1/locations", json={"name": "Komoda", "kind": "furniture"}), 201)
+    by_kind = ok(client.get("/api/v1/search", params={"q": "nabytek"}))
+    assert [x["name"] for x in by_kind["locations"]] == ["Komoda"]
+    only_kind = ok(client.get("/api/v1/search", params={"kind": "furniture", "scope": "locations"}))
+    assert [x["name"] for x in only_kind["locations"]] == ["Komoda"]
+    assert only_kind["items"] == [] and only_kind["totals"]["locations"] == 1
+    assert ok(client.get("/api/v1/search"))["locations"] == []  # bez textu i druhu nic
+    bad_kind = client.get("/api/v1/search", params={"kind": "neexistuje"})
+    assert bad_kind.status_code == 422
+    # nové filtry seznamu věcí se přijímají a kombinují
+    listed = ok(
+        client.get(
+            "/api/v1/items",
+            params={"location_kind": ["box", "furniture"], "min_qty": "0", "has_photo": "false"},
+        )
+    )
+    assert listed["total"] == len(listed["items"])
+    assert client.get("/api/v1/items", params={"sort": "price"}).status_code == 200
+
     settings = {x["key"]: x for x in ok(client.get("/api/v1/settings"))}
     assert settings["ui.theme"]["value"] == "auto" and settings["ui.theme"]["is_default"]
     ok(client.put("/api/v1/settings/ui.theme", json={"value": "dark"}), 204)

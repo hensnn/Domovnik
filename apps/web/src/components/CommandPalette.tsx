@@ -4,9 +4,13 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { useSearch } from "../api/hooks";
-import { Input, Spinner } from "./ui";
+import type { LocationKind, SearchScope } from "../api/types";
+import { LOCATION_KINDS } from "../lib/format";
+import { Chip, Input, Spinner } from "./ui";
 
-/** Rychlé hledání (Ctrl+K): věci, umístění, kategorie. */
+const SCOPES: SearchScope[] = ["all", "items", "locations", "categories"];
+
+/** Rychlé hledání (Ctrl+K): věci, umístění (i podle druhu, např. „nábytek“), kategorie. */
 export default function CommandPalette({
   open,
   onOpenChange,
@@ -18,6 +22,8 @@ export default function CommandPalette({
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [scope, setScope] = useState<SearchScope>("all");
+  const [kinds, setKinds] = useState<LocationKind[]>([]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(q), 200);
@@ -35,16 +41,35 @@ export default function CommandPalette({
     return () => window.removeEventListener("keydown", handler);
   }, [onOpenChange]);
 
-  const results = useSearch(debounced);
+  // Zúžený výběr (jeden typ / druh umístění) ukáže víc nálezů než souhrn.
+  const results = useSearch(debounced, { scope, kinds, limit: scope === "all" ? 8 : 50 });
   if (!open) return null;
 
   const go = (to: string) => {
     onOpenChange(false);
     setQ("");
+    setScope("all");
+    setKinds([]);
     navigate(to);
   };
+  const toggleKind = (k: LocationKind) => {
+    setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+    setScope("locations"); // druh se týká jen umístění
+  };
   const data = results.data;
+  const hasQuery = q.trim().length > 0 || kinds.length > 0;
   const empty = data && !data.items.length && !data.locations.length && !data.categories.length;
+  const more = (key: "items" | "locations" | "categories", shown: number) => {
+    const total = data?.totals?.[key] ?? 0;
+    return scope === "all" && total > shown ? (
+      <button
+        onClick={() => setScope(key)}
+        className="w-full rounded-lg px-2 py-1.5 text-left text-xs text-brand-700 hover:bg-slate-100 dark:text-brand-100 dark:hover:bg-slate-800"
+      >
+        {t("search.showAll", { count: total })}
+      </button>
+    ) : null;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-[10dvh]">
@@ -58,21 +83,42 @@ export default function CommandPalette({
         aria-label={t("search.open")}
         className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900"
       >
-        <div className="border-b border-slate-200 p-3 dark:border-slate-800">
+        <div className="space-y-2 border-b border-slate-200 p-3 dark:border-slate-800">
           <Input
             autoFocus
             placeholder={t("search.placeholder")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
+          <div className="flex flex-wrap gap-1" role="group" aria-label={t("search.scopeLabel")}>
+            {SCOPES.map((s) => (
+              <Chip key={s} active={scope === s} onClick={() => setScope(s)}>
+                {t(`search.scope.${s}`)}
+              </Chip>
+            ))}
+          </div>
+          <div
+            className="flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label={t("search.kindLabel")}
+          >
+            <span className="mr-1 text-xs text-slate-500">{t("search.kindLabel")}:</span>
+            {LOCATION_KINDS.map((k) => (
+              <Chip key={k} active={kinds.includes(k)} onClick={() => toggleKind(k)}>
+                {t(`kind.${k}`)}
+              </Chip>
+            ))}
+          </div>
         </div>
-        <div className="max-h-[60dvh] overflow-y-auto p-2">
+        <div className="max-h-[55dvh] overflow-y-auto p-2">
           {results.isFetching && !data && <Spinner />}
-          {!q.trim() && (
+          {!hasQuery && (
             <p className="p-4 text-center text-sm text-slate-500">{t("search.hint")}</p>
           )}
-          {empty && <p className="p-4 text-center text-sm text-slate-500">{t("search.none")}</p>}
-          {data && data.items.length > 0 && (
+          {hasQuery && empty && (
+            <p className="p-4 text-center text-sm text-slate-500">{t("search.none")}</p>
+          )}
+          {hasQuery && data && data.items.length > 0 && (
             <Group title={t("nav.items")}>
               {data.items.map((i) => (
                 <Row
@@ -86,9 +132,18 @@ export default function CommandPalette({
                   </span>
                 </Row>
               ))}
+              {more("items", data.items.length)}
+              {q.trim() && (
+                <button
+                  onClick={() => go(`/items?q=${encodeURIComponent(q.trim())}`)}
+                  className="w-full rounded-lg px-2 py-1.5 text-left text-xs text-brand-700 hover:bg-slate-100 dark:text-brand-100 dark:hover:bg-slate-800"
+                >
+                  {t("search.openInItems")}
+                </button>
+              )}
             </Group>
           )}
-          {data && data.locations.length > 0 && (
+          {hasQuery && data && data.locations.length > 0 && (
             <Group title={t("nav.locations")}>
               {data.locations.map((l) => (
                 <Row
@@ -97,12 +152,15 @@ export default function CommandPalette({
                   onClick={() => go(`/locations/${l.id}`)}
                 >
                   <span className="font-medium">{l.name}</span>
-                  <span className="text-xs text-slate-500">{l.full_name}</span>
+                  <span className="text-xs text-slate-500">
+                    {t(`kind.${l.kind}`)} · {l.full_name}
+                  </span>
                 </Row>
               ))}
+              {more("locations", data.locations.length)}
             </Group>
           )}
-          {data && data.categories.length > 0 && (
+          {hasQuery && data && data.categories.length > 0 && (
             <Group title={t("nav.categories")}>
               {data.categories.map((c) => (
                 <Row
@@ -114,6 +172,7 @@ export default function CommandPalette({
                   <span className="text-xs text-slate-500">{c.item_count}×</span>
                 </Row>
               ))}
+              {more("categories", data.categories.length)}
             </Group>
           )}
         </div>

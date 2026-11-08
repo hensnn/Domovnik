@@ -107,8 +107,18 @@
   "search": {
     "open": "Hledat",
     "placeholder": "Hledat věci, místa, kategorie…",
-    "hint": "Začni psát. Hledá se i bez diakritiky a s překlepy.",
-    "none": "Nic nenalezeno."
+    "hint": "Začni psát. Hledá se i bez diakritiky a s překlepy. Umístění najdeš i podle druhu (nábytek, místnost, police…) – stačí kliknout na druh níže.",
+    "none": "Nic nenalezeno.",
+    "scopeLabel": "Co hledat",
+    "scope": {
+      "all": "Vše",
+      "items": "Věci",
+      "locations": "Místa",
+      "categories": "Kategorie"
+    },
+    "kindLabel": "Druh umístění",
+    "showAll": "Zobrazit všech {{count}}",
+    "openInItems": "Otevřít v seznamu věcí s filtry →"
   },
   "scan": {
     "nav": "Skenovat",
@@ -259,6 +269,41 @@
     "lowStock": "Dochází",
     "filters": "Filtry",
     "clearFilters": "Zrušit filtry",
+    "moreFilters": "Další filtry",
+    "fewerFilters": "Méně filtrů",
+    "adv": {
+      "locationKind": "Druh umístění",
+      "locationKindHint": "Věci uložené v umístění zvoleného druhu (např. jen v nábytku nebo v krabicích).",
+      "photo": "Fotka",
+      "withPhoto": "Jen s fotkou",
+      "withoutPhoto": "Jen bez fotky",
+      "priceFrom": "Cena od",
+      "priceTo": "Cena do",
+      "qtyFrom": "Množství od",
+      "qtyTo": "Množství do",
+      "purchasedFrom": "Koupeno od",
+      "purchasedTo": "Koupeno do",
+      "createdFrom": "Přidáno od",
+      "updatedFrom": "Upraveno od",
+      "warrantyTo": "Záruka končí do",
+      "expiresTo": "Trvanlivost do",
+      "noCategory": "Jen bez kategorie",
+      "warrantyActive": "Záruka ještě běží",
+      "expired": "Prošlá trvanlivost",
+      "sort": "Řazení",
+      "descending": "Sestupně"
+    },
+    "sortBy": {
+      "relevance": "Podle shody",
+      "name": "Název",
+      "label": "Štítek",
+      "updated": "Naposledy upraveno",
+      "created": "Nejnověji přidané",
+      "price": "Cena",
+      "quantity": "Množství",
+      "warranty": "Konec záruky",
+      "expires": "Trvanlivost"
+    },
     "onlyUnplaced": "Jen nezařazené",
     "onlyLowStock": "Jen docházející",
     "onlyTrash": "Jen koš",

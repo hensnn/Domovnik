@@ -17,9 +17,11 @@ import type {
   ItemFilters,
   ItemPage,
   Location,
+  LocationKind,
   Movement,
   PhotoAnalysis,
   SearchResults,
+  SearchScope,
   SettingDef,
   StoredMessage,
   Tag,
@@ -64,13 +66,18 @@ export const useItemMovements = (id: string | undefined) =>
 export const useDashboard = () =>
   useQuery({ queryKey: ["stats"], queryFn: () => get<Dashboard>("/stats") });
 
-export const useSearch = (q: string) =>
-  useQuery({
-    queryKey: ["search", q],
-    queryFn: () => get<SearchResults>("/search", { q, limit: 8 }),
-    enabled: q.trim().length > 0,
+export const useSearch = (
+  q: string,
+  opts: { scope?: SearchScope; kinds?: LocationKind[]; limit?: number } = {},
+) => {
+  const { scope = "all", kinds = [], limit = 8 } = opts;
+  return useQuery({
+    queryKey: ["search", q, scope, kinds, limit],
+    queryFn: () => get<SearchResults>("/search", { q, limit, scope, kind: kinds }),
+    enabled: q.trim().length > 0 || kinds.length > 0,
     placeholderData: keepPreviousData,
   });
+};
 
 export const useSettings = () =>
   useQuery({ queryKey: ["settings"], queryFn: () => get<SettingDef[]>("/settings") });

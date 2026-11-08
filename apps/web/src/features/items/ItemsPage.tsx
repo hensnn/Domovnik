@@ -25,7 +25,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { api_, useApiMutation, useItem, useItems, useSettings } from "../../api/hooks";
-import type { Item, ItemFilters, ItemStatus } from "../../api/types";
+import type { Item, ItemFilters, ItemStatus, LocationKind } from "../../api/types";
 import { CategorySelect, LocationSelect, TagInput } from "../../components/Pickers";
 import { Thumb } from "../../components/Thumb";
 import {
@@ -47,6 +47,7 @@ import { STATUS_TONE, formatDate, formatQty, placementSummary } from "../../lib/
 import { useStoredState } from "../../lib/storage";
 import { useAuth } from "../auth/AuthProvider";
 import PrintLabelsDialog from "../labels/PrintLabelsDialog";
+import AdvancedFilters, { advancedFilterCount } from "./AdvancedFilters";
 import ItemDetail from "./ItemDetail";
 import ItemForm from "./ItemForm";
 
@@ -86,6 +87,23 @@ export default function ItemsPage() {
     unplaced: params.get("unplaced") === "1" ? true : undefined,
     low_stock: params.get("low_stock") === "1" ? true : undefined,
     trash: params.get("trash") === "1" ? true : undefined,
+    location_kind: params.getAll("location_kind") as LocationKind[],
+    brand: params.get("brand") ?? undefined,
+    condition: params.get("condition") ?? undefined,
+    has_photo: params.has("has_photo") ? params.get("has_photo") === "1" : undefined,
+    no_category: params.get("no_category") === "1" ? true : undefined,
+    min_price: params.get("min_price") ?? undefined,
+    max_price: params.get("max_price") ?? undefined,
+    purchased_after: params.get("purchased_after") ?? undefined,
+    purchased_before: params.get("purchased_before") ?? undefined,
+    min_qty: params.get("min_qty") ?? undefined,
+    max_qty: params.get("max_qty") ?? undefined,
+    created_after: params.get("created_after") ?? undefined,
+    updated_after: params.get("updated_after") ?? undefined,
+    warranty_before: params.get("warranty_before") ?? undefined,
+    expires_before: params.get("expires_before") ?? undefined,
+    expired: params.get("expired") === "1" ? true : undefined,
+    warranty_active: params.get("warranty_active") === "1" ? true : undefined,
     sort: params.get("sort") ?? (params.get("q") ? "relevance" : "name"),
     desc: params.get("desc") === "1",
     limit: pageSize,
@@ -100,6 +118,8 @@ export default function ItemsPage() {
     filters.low_stock,
     filters.trash,
   ].filter(Boolean).length;
+  const advancedCount = advancedFilterCount(filters);
+  const totalFilterCount = activeFilterCount + advancedCount;
 
   const update = (patch: Record<string, string | string[] | null>) => {
     const next = new URLSearchParams(params);
@@ -122,6 +142,7 @@ export default function ItemsPage() {
     "updated",
   ]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [showCols, setShowCols] = useState(false);
   const [creating, setCreating] = useState(params.get("new") === "1");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -291,7 +312,7 @@ export default function ItemsPage() {
         </div>
         <Button onClick={() => setShowFilters((v) => !v)} aria-pressed={showFilters}>
           <Filter className="size-4" /> {t("items.filters")}
-          {activeFilterCount > 0 && <Badge tone="blue">{activeFilterCount}</Badge>}
+          {totalFilterCount > 0 && <Badge tone="blue">{totalFilterCount}</Badge>}
         </Button>
         <div className="hidden gap-1 md:flex">
           <Button
@@ -401,7 +422,11 @@ export default function ItemsPage() {
               checked={!!filters.trash}
               onChange={(v) => update({ trash: v ? "1" : null })}
             />
-            {activeFilterCount > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setShowMore((v) => !v)}>
+              {showMore || advancedCount > 0 ? t("items.fewerFilters") : t("items.moreFilters")}
+              {advancedCount > 0 && <Badge tone="blue">{advancedCount}</Badge>}
+            </Button>
+            {totalFilterCount > 0 && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -411,6 +436,7 @@ export default function ItemsPage() {
               </Button>
             )}
           </div>
+          {(showMore || advancedCount > 0) && <AdvancedFilters filters={filters} update={update} />}
         </Card>
       )}
 
@@ -445,10 +471,10 @@ export default function ItemsPage() {
       ) : data.items.length === 0 ? (
         <Card>
           <EmptyState
-            title={activeFilterCount || filters.q ? t("items.noResults") : t("items.empty")}
-            hint={activeFilterCount || filters.q ? undefined : t("items.emptyHint")}
+            title={totalFilterCount || filters.q ? t("items.noResults") : t("items.empty")}
+            hint={totalFilterCount || filters.q ? undefined : t("items.emptyHint")}
             action={
-              canWrite && !filters.trash && !(activeFilterCount || filters.q) ? (
+              canWrite && !filters.trash && !(totalFilterCount || filters.q) ? (
                 <Button variant="primary" onClick={() => setCreating(true)}>
                   {t("items.add")}
                 </Button>

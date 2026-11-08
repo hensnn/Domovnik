@@ -61,6 +61,33 @@ export function IconButton({
   );
 }
 
+/** Přepínací „čip“ (filtr zapnutý / vypnutý). */
+export function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={clsx(
+        "rounded-full border px-2.5 py-0.5 text-xs",
+        active
+          ? "border-brand-600 bg-brand-600 text-white"
+          : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 // --- Formulářové prvky --------------------------------------------------------------------
 
 const inputCls =

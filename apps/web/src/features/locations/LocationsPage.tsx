@@ -37,6 +37,7 @@ import {
   useToast,
 } from "../../components/ui";
 import {
+  LOCATION_KINDS,
   type TreeNode,
   buildTree,
   formatQty,
@@ -47,17 +48,7 @@ import { useAuth } from "../auth/AuthProvider";
 import FileGallery from "../files/FileGallery";
 import PrintLabelsDialog from "../labels/PrintLabelsDialog";
 
-const KINDS: LocationKind[] = [
-  "building",
-  "floor",
-  "room",
-  "zone",
-  "furniture",
-  "shelf",
-  "drawer",
-  "box",
-  "other",
-];
+const KINDS = LOCATION_KINDS;
 
 /** Sdílený stav přetahování ve stromu umístění. */
 interface DragCtx {
