@@ -115,7 +115,7 @@ describe("Asistent při kontrole nálezů", () => {
     );
     expect(within(card1).getByText(/50 ks/)).toBeInTheDocument();
     const card2 = screen.getByRole("article", { name: /Pásek/ });
-    expect(within(card2).getByText("Dům › Krabice (nové)")).toBeInTheDocument();
+    expect(within(card2).getAllByText(/Dům › Krabice \(nové\)/).length).toBeGreaterThan(0);
     expect(onCommit).not.toHaveBeenCalled(); // zatím nic uloženo
 
     // vrácení zruší úpravy asistenta

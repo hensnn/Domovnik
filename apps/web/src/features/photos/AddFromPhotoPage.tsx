@@ -327,7 +327,7 @@ function Shell({
   wide?: boolean;
 }) {
   return (
-    <div className={`mx-auto space-y-3 p-3 md:p-5 ${wide ? "max-w-7xl" : "max-w-2xl"}`}>
+    <div className={`mx-auto space-y-3 p-3 md:p-5 ${wide ? "max-w-none" : "max-w-2xl"}`}>
       <h1 className="text-xl font-bold">{title}</h1>
       {children}
     </div>

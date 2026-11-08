@@ -1,19 +1,17 @@
 import clsx from "clsx";
 import {
-  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   Check,
-  GitMerge,
+  FolderInput,
   Maximize2,
-  Pencil,
-  Plus,
   Sparkles,
-  Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useCategories } from "../../api/hooks";
+import { useLocations } from "../../api/hooks";
 import type {
   Detection,
   DetectionDecision,
@@ -21,10 +19,8 @@ import type {
   PhotoAnalysis,
   RefineEdit,
 } from "../../api/types";
-import { LocationSelect, TagInput } from "../../components/Pickers";
 import { thumbUrl } from "../../components/Thumb";
-import { Badge, Button, Field, Input, Select, Textarea, useToast } from "../../components/ui";
-import { flattenTree } from "../../lib/format";
+import { Button, Chip, useToast } from "../../components/ui";
 import {
   type Choice,
   type ReviewState,
@@ -33,22 +29,29 @@ import {
   applyRefineEdits,
   buildDecisions,
   buildDraft,
-  categoryPathOf,
-  confidencePercent,
   confidenceTone,
   initialChoice,
   mergeOverrides,
-  parsePath,
-  pathToText,
-  pathsEqual,
   revertRefine,
   summarize,
 } from "../../lib/photos";
-
+import {
+  type Group,
+  type GroupMode,
+  type Move,
+  dropOnGroup,
+  effectiveOf,
+  groupDetections,
+  moveDetections,
+} from "../../lib/reviewGroups";
+import DetectionRow from "./DetectionRow";
+import MoveDialog from "./MoveDialog";
 import PhotoViewer from "./PhotoViewer";
 import ReviewAssistant from "./ReviewAssistant";
 
-const NEW_CATEGORY = "__new__";
+const MODES: GroupMode[] = ["triage", "location", "category", "decision"];
+/** Do tohoto počtu nálezů jsou řádky rozbalené, u delších seznamů sbalené pro přehlednost. */
+const EXPAND_ALL_UP_TO = 6;
 
 export default function ReviewScreen({
   analysis,
@@ -75,6 +78,15 @@ export default function ReviewScreen({
   const [assistant, setAssistant] = useState(false);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [flash, setFlash] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<GroupMode>("triage");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(dets.length <= EXPAND_ALL_UP_TO ? dets.map((d) => d.id) : []),
+  );
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [moving, setMoving] = useState<string[] | null>(null);
+  const [dragIds, setDragIds] = useState<string[] | null>(null);
+  const [overGroup, setOverGroup] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   // Poslední stav kontroly pro asistenta (odpověď přijde asynchronně, po dalších úpravách).
   const latest = useRef<ReviewState>({ choices, overrides, labels });
@@ -84,6 +96,25 @@ export default function ReviewScreen({
   const flashTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
+  const { data: locations = [] } = useLocations();
+  const locName = useCallback(
+    (id: string) => locations.find((l) => l.id === id)?.full_name ?? undefined,
+    [locations],
+  );
+
+  const eff = useMemo(
+    () =>
+      new Map(
+        dets.map((d) => [d.id, effectiveOf(d, overrides[d.id] ?? {}, labels, locName)] as const),
+      ),
+    [dets, overrides, labels, locName],
+  );
+  const groups = useMemo(
+    () => groupDetections(dets, { choices, overrides, labels, locName }, mode),
+    [dets, choices, overrides, labels, locName, mode],
+  );
+  const indexOf = useMemo(() => new Map(dets.map((d, i) => [d.id, i + 1] as const)), [dets]);
+
   const sum = summarize(choices);
   const confidentLeft = dets.filter(
     (d) => choices[d.id] === "pending" && d.confidence >= 0.8 && !d.matched_item,
@@ -91,11 +122,19 @@ export default function ReviewScreen({
 
   const select = (id: string, scroll: boolean) => {
     setActive(id);
-    if (scroll) cardRefs.current[id]?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (!scroll) return;
+    // z fotky: rozbalí řádek i jeho skupinu a doskroluje k němu
+    setExpanded((s) => new Set(s).add(id));
+    const g = groups.find((x) => x.ids.includes(id));
+    if (g) setCollapsedGroups((s) => new Set([...s].filter((k) => k !== g.key)));
+    window.setTimeout(
+      () => cardRefs.current[id]?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }),
+      0,
+    );
   };
 
   const patchOverrides = (d: Detection, patch: DetectionOverrides) => {
-    // ruční změna umístění zruší popisek, který nastavil asistent
+    // ruční změna umístění zruší popisek, který nastavil asistent nebo přesun
     if ("location_id" in patch || "location_path" in patch) {
       setLabels((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== d.id)));
     }
@@ -118,7 +157,7 @@ export default function ReviewScreen({
     setState(r.next);
     flashCards(r.touched);
     if (r.touched[0]) select(r.touched[0], true);
-    const indexes = r.touched.map((id) => dets.findIndex((d) => d.id === id) + 1);
+    const indexes = r.touched.map((id) => indexOf.get(id) ?? 0);
     return { undo: r.undo, touched: r.touched, indexes };
   };
   const undoEdits = (undo: UndoEntry[]) => {
@@ -132,10 +171,83 @@ export default function ReviewScreen({
     toast(t("photos.acceptedAll", { count: r.accepted }));
   };
 
+  // --- výběr, sbalení, přesun --------------------------------------------------------------
+  const toggleSet = (setter: typeof setSelected, id: string) =>
+    setter((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const toggleGroupSelection = (g: Group) =>
+    setSelected((s) => {
+      const all = g.ids.every((id) => s.has(id));
+      const n = new Set(s);
+      g.ids.forEach((id) => (all ? n.delete(id) : n.add(id)));
+      return n;
+    });
+  const allGroupsCollapsed = groups.length > 0 && groups.every((g) => collapsedGroups.has(g.key));
+  const toggleAllGroups = () => {
+    if (allGroupsCollapsed) {
+      setCollapsedGroups(new Set());
+      setExpanded(new Set(dets.map((d) => d.id)));
+    } else {
+      setCollapsedGroups(new Set(groups.map((g) => g.key)));
+    }
+  };
+
+  const applyMove = (ids: string[], move: Move) => {
+    const r = moveDetections(dets, latest.current, ids, move);
+    setState(r.next);
+    flashCards(ids);
+    toast(t("photos.move.done", { count: r.count }));
+  };
+  const setChoiceFor = (ids: string[], c: Choice) =>
+    setChoices((all) => {
+      const next = { ...all };
+      const dup = new Set(dets.filter((d) => d.matched_item).map((d) => d.id));
+      ids.forEach((id) => {
+        if (c !== "merge" || dup.has(id)) next[id] = c;
+      });
+      return next;
+    });
+
+  const startDrag = (id: string) => {
+    const ids = selected.has(id) ? [...selected] : [id];
+    setDragIds(ids);
+    return ids;
+  };
+  const dropOn = (g: Group) => {
+    const ids = dragIds;
+    setDragIds(null);
+    setOverGroup(null);
+    if (!ids || !g.drop) return;
+    const r = dropOnGroup(dets, latest.current, ids, g.drop);
+    setState(r.next);
+    flashCards(ids);
+    toast(t("photos.move.done", { count: r.count }));
+  };
+
+  const groupTitle = (g: Group): string => {
+    switch (g.kind) {
+      case "unnamed":
+      case "nocat":
+      case "noloc":
+      case "done":
+        return t(`photos.group.${g.kind}`);
+      case "decision":
+        return t(`photos.group.${g.choice ?? "pending"}`);
+      default:
+        return g.title ?? "";
+    }
+  };
+  const groupHint = (g: Group): string | null =>
+    ["unnamed", "nocat", "noloc", "done"].includes(g.kind) ? t(`photos.group.${g.kind}Hint`) : null;
+
   return (
     <div>
-      <div className="md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:gap-4">
-        <div className="sticky top-0 z-10 -mx-3 bg-slate-50 px-3 pb-2 pt-1 md:top-3 md:mx-0 md:self-start md:bg-transparent md:p-0 dark:bg-slate-950 md:dark:bg-transparent">
+      <div className="lg:grid lg:grid-cols-[minmax(300px,36%)_minmax(0,1fr)] lg:gap-4 2xl:grid-cols-[minmax(380px,34%)_minmax(0,1fr)]">
+        <div className="sticky top-0 z-10 -mx-3 bg-slate-50 px-3 pb-2 pt-1 lg:top-3 lg:mx-0 lg:self-start lg:bg-transparent lg:p-0 dark:bg-slate-950 lg:dark:bg-transparent">
           <PhotoWithBoxes
             fileId={analysis.file_id}
             detections={dets}
@@ -151,9 +263,17 @@ export default function ReviewScreen({
           )}
         </div>
 
-        <div className="mt-2 space-y-3 md:mt-0">
+        <div className="mt-2 min-w-0 space-y-3 lg:mt-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="mr-auto font-semibold">{t("photos.found", { count: dets.length })}</h2>
+            <Button size="sm" onClick={toggleAllGroups} disabled={dets.length === 0}>
+              {allGroupsCollapsed ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+              {allGroupsCollapsed ? t("photos.toolbar.expandAll") : t("photos.toolbar.collapseAll")}
+            </Button>
             <Button
               size="sm"
               aria-pressed={assistant}
@@ -167,35 +287,184 @@ export default function ReviewScreen({
             </Button>
           </div>
 
+          {dets.length > 0 && (
+            <div
+              className="flex flex-wrap items-center gap-1"
+              role="group"
+              aria-label={t("photos.mode.label")}
+            >
+              <span className="mr-1 text-xs text-slate-500">{t("photos.mode.label")}:</span>
+              {MODES.map((m) => (
+                <Chip key={m} active={mode === m} onClick={() => setMode(m)}>
+                  {t(`photos.mode.${m}`)}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {selected.size > 0 && (
+            <div
+              role="region"
+              aria-label={t("photos.selection.label")}
+              className="flex flex-wrap items-center gap-2 rounded-lg bg-brand-600 p-2 text-sm text-white shadow"
+            >
+              <span className="px-2 font-medium">
+                {t("photos.selection.count", { count: selected.size })}
+              </span>
+              <Button size="sm" onClick={() => setMoving([...selected])}>
+                <FolderInput className="size-4" /> {t("photos.selection.move")}
+              </Button>
+              <Button size="sm" onClick={() => setChoiceFor([...selected], "accept")}>
+                {t("photos.accept")}
+              </Button>
+              <Button size="sm" onClick={() => setChoiceFor([...selected], "reject")}>
+                {t("photos.reject")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="!text-white"
+                onClick={() => setSelected(new Set())}
+              >
+                <X className="size-4" /> {t("photos.selection.clear")}
+              </Button>
+            </div>
+          )}
+
           {dets.length === 0 && (
             <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">
               {t("photos.nothingFound")}
             </p>
           )}
 
-          <ul className="space-y-3">
-            {dets.map((d, i) => (
-              <li
-                key={d.id}
-                ref={(el) => {
-                  cardRefs.current[d.id] = el;
+          {groups.map((g) => {
+            const title = groupTitle(g);
+            const hint = groupHint(g);
+            const collapsed = collapsedGroups.has(g.key);
+            const droppable = !!dragIds && !!g.drop;
+            const allSelected = g.ids.every((id) => selected.has(id));
+            return (
+              <section
+                key={g.key}
+                aria-label={title}
+                onDragOver={(e) => {
+                  if (!droppable) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setOverGroup(g.key);
                 }}
+                onDragLeave={() => setOverGroup((k) => (k === g.key ? null : k))}
+                onDrop={(e) => {
+                  if (!droppable) return;
+                  e.preventDefault();
+                  dropOn(g);
+                }}
+                className={clsx(
+                  "rounded-xl border p-2",
+                  g.kind === "unnamed" || g.kind === "nocat" || g.kind === "noloc"
+                    ? "border-amber-300 bg-amber-50/40 dark:border-amber-700/50 dark:bg-amber-950/10"
+                    : "border-slate-200 dark:border-slate-800",
+                  droppable && g.drop && "border-dashed",
+                  overGroup === g.key &&
+                    "!border-brand-500 bg-brand-50 ring-2 ring-brand-500/40 dark:bg-brand-700/20",
+                )}
               >
-                <DetectionCard
-                  detection={d}
-                  index={i + 1}
-                  choice={choices[d.id] ?? "pending"}
-                  overrides={overrides[d.id] ?? {}}
-                  locLabel={labels[d.id]}
-                  flash={flash.has(d.id)}
-                  active={active === d.id}
-                  onSelect={() => select(d.id, false)}
-                  onChoice={(c) => setChoices((all) => ({ ...all, [d.id]: c }))}
-                  onOverrides={(p) => patchOverrides(d, p)}
-                />
-              </li>
-            ))}
-          </ul>
+                <div className="flex items-center gap-2 px-1 pb-1">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => toggleGroupSelection(g)}
+                    aria-label={t("photos.group.selectAll", { title })}
+                    className="size-4"
+                  />
+                  <button
+                    type="button"
+                    aria-expanded={!collapsed}
+                    aria-label={
+                      collapsed
+                        ? t("photos.group.expand", { title })
+                        : t("photos.group.collapse", { title })
+                    }
+                    onClick={() => toggleSet(setCollapsedGroups, g.key)}
+                    className="flex min-w-0 flex-1 items-center gap-1 text-left"
+                  >
+                    {collapsed ? (
+                      <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden />
+                    ) : (
+                      <ChevronDown className="size-4 shrink-0 text-slate-400" aria-hidden />
+                    )}
+                    <span className="truncate font-semibold">{title}</span>
+                    <span className="rounded-full bg-slate-200 px-2 text-xs dark:bg-slate-700">
+                      {g.ids.length}
+                    </span>
+                    {hint && (
+                      <span className="hidden truncate text-xs text-slate-500 sm:inline">
+                        {hint}
+                      </span>
+                    )}
+                  </button>
+                  {droppable && g.drop && (
+                    <span className="text-xs text-brand-700 dark:text-brand-100">
+                      {t("photos.group.dropHere")}
+                    </span>
+                  )}
+                </div>
+                {!collapsed && (
+                  <ul className="space-y-2">
+                    {g.ids.map((id) => {
+                      const d = dets.find((x) => x.id === id)!;
+                      return (
+                        <li
+                          key={id}
+                          ref={(el) => {
+                            cardRefs.current[id] = el;
+                          }}
+                        >
+                          <DetectionRow
+                            detection={d}
+                            index={indexOf.get(id) ?? 0}
+                            choice={choices[id] ?? "pending"}
+                            overrides={overrides[id] ?? {}}
+                            eff={eff.get(id)!}
+                            flash={flash.has(id)}
+                            active={active === id}
+                            expanded={expanded.has(id)}
+                            selected={selected.has(id)}
+                            drag={{
+                              onDragStart: (e) => {
+                                const ids = startDrag(id);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", ids.join(","));
+                                const row = cardRefs.current[id];
+                                if (row) e.dataTransfer.setDragImage(row, 20, 20);
+                              },
+                              onDragEnd: () => {
+                                setDragIds(null);
+                                setOverGroup(null);
+                              },
+                            }}
+                            onSelect={() => select(id, false)}
+                            onExpand={(open) =>
+                              setExpanded((s) => {
+                                const n = new Set(s);
+                                if (open) n.add(id);
+                                else n.delete(id);
+                                return n;
+                              })
+                            }
+                            onToggleSelect={() => toggleSet(setSelected, id)}
+                            onChoice={(c) => setChoices((all) => ({ ...all, [id]: c }))}
+                            onOverrides={(p) => patchOverrides(d, p)}
+                            onMove={() => setMoving([id])}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
         </div>
       </div>
 
@@ -208,6 +477,17 @@ export default function ReviewScreen({
           onSelect={(id) => select(id, true)}
           onChoice={(id, c) => setChoices((all) => ({ ...all, [id]: c }))}
           onClose={() => setViewer(false)}
+        />
+      )}
+
+      {moving && (
+        <MoveDialog
+          count={moving.length}
+          onApply={(move) => {
+            applyMove(moving, move);
+            setMoving(null);
+          }}
+          onClose={() => setMoving(null)}
         />
       )}
 
@@ -327,351 +607,6 @@ function PhotoWithBoxes({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-// --- Karta detekce --------------------------------------------------------------------------
-
-function DetectionCard({
-  detection: d,
-  index,
-  choice,
-  overrides,
-  locLabel,
-  flash,
-  active,
-  onSelect,
-  onChoice,
-  onOverrides,
-}: {
-  detection: Detection;
-  index: number;
-  choice: Choice;
-  overrides: DetectionOverrides;
-  /** čitelný název umístění vybraného asistentem */
-  locLabel?: string;
-  /** krátké zvýraznění po úpravě asistentem */
-  flash: boolean;
-  active: boolean;
-  onSelect: () => void;
-  onChoice: (c: Choice) => void;
-  onOverrides: (p: DetectionOverrides) => void;
-}) {
-  const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const eff = { ...d.suggested, ...overrides };
-  const tone = confidenceTone(d.confidence);
-  const locId = overrides.location_path
-    ? null
-    : (overrides.location_id ?? d.suggested_location?.id ?? null);
-  const newPathText = overrides.location_path?.length
-    ? `${overrides.location_path.join(" › ")} (${t("photos.assistant.newLocation")})`
-    : undefined;
-  const chosenText = locLabel ?? newPathText;
-  const locPath =
-    d.suggested_location?.path?.join(" › ") ?? d.suggested_location?.full_name ?? undefined;
-  const m = d.matched_item;
-  const toggle = (c: Choice) => onChoice(choice === c ? "pending" : c);
-
-  return (
-    <article
-      aria-label={t("photos.cardLabel", { n: index, name: eff.name })}
-      onClick={onSelect}
-      className={clsx(
-        "space-y-2 rounded-xl border bg-white p-3 text-sm dark:bg-slate-900",
-        active
-          ? "border-brand-500 ring-2 ring-brand-500/30"
-          : "border-slate-200 dark:border-slate-800",
-        flash && "ring-2 ring-amber-400",
-        choice === "accept" && "border-l-4 border-l-emerald-500",
-        choice === "merge" && "border-l-4 border-l-sky-500",
-        choice === "reject" && "opacity-60",
-      )}
-    >
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-bold text-white dark:bg-slate-100 dark:text-slate-900">
-          {index}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-medium">{eff.name || d.label}</div>
-          <div className="text-xs text-slate-500">
-            {eff.category_path.length ? eff.category_path.join(" › ") : t("items.noCategory")} ·{" "}
-            {eff.quantity} {eff.unit}
-          </div>
-        </div>
-        <Badge tone={tone === "green" ? "green" : tone === "amber" ? "amber" : "red"}>
-          <span className="sr-only">{t("photos.confidence")}: </span>
-          {confidencePercent(d.confidence)}
-        </Badge>
-      </div>
-
-      {d.description && <p className="text-xs text-slate-500">{d.description}</p>}
-      {eff.text_read && (
-        <p className="text-xs text-slate-500">
-          {t("photos.textRead")}: <q>{eff.text_read}</q>
-        </p>
-      )}
-
-      <div className="text-xs text-slate-600 dark:text-slate-400">
-        <span className="font-medium">{t("items.location")}:</span>{" "}
-        {chosenText ? (
-          chosenText
-        ) : overrides.location_id ? (
-          t("photos.locationChosen")
-        ) : locPath ? (
-          <>
-            {locPath}
-            {d.suggested_location?.reason && (
-              <span className="text-slate-500"> ({d.suggested_location.reason})</span>
-            )}
-          </>
-        ) : locId ? (
-          t("photos.locationChosen")
-        ) : (
-          t("items.unplaced")
-        )}
-      </div>
-
-      {m && (
-        <div
-          role="note"
-          className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs dark:bg-amber-950/40"
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
-          <span>
-            {t("photos.duplicate", { name: m.name })}{" "}
-            <span className="text-slate-500">
-              {m.label_code}
-              {m.location_path ? ` · ${m.location_path}` : ""}
-            </span>
-          </span>
-        </div>
-      )}
-
-      {editing && (
-        <EditFields detection={d} overrides={overrides} locId={locId} onChange={onOverrides} />
-      )}
-
-      <div className="flex flex-wrap gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-        {m ? (
-          <>
-            <Button
-              size="sm"
-              variant={choice === "accept" ? "primary" : "secondary"}
-              aria-pressed={choice === "accept"}
-              onClick={() => toggle("accept")}
-            >
-              <Plus className="size-4" /> {t("photos.addAsNew")}
-            </Button>
-            <Button
-              size="sm"
-              variant={choice === "merge" ? "primary" : "secondary"}
-              aria-pressed={choice === "merge"}
-              onClick={() => toggle("merge")}
-            >
-              <GitMerge className="size-4" /> {t("photos.mergeExisting")}
-            </Button>
-          </>
-        ) : (
-          <Button
-            size="sm"
-            variant={choice === "accept" ? "primary" : "secondary"}
-            aria-pressed={choice === "accept"}
-            onClick={() => toggle("accept")}
-          >
-            <Check className="size-4" /> {t("photos.accept")}
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant={choice === "reject" ? "danger" : "secondary"}
-          aria-pressed={choice === "reject"}
-          onClick={() => toggle("reject")}
-        >
-          <X className="size-4" /> {t("photos.reject")}
-        </Button>
-        {choice !== "reject" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setEditing((v) => !v)}
-            aria-expanded={editing}
-          >
-            <Pencil className="size-4" /> {editing ? t("photos.hideEdit") : t("common.edit")}
-          </Button>
-        )}
-        {choice !== "pending" && (
-          <Button size="sm" variant="ghost" onClick={() => onChoice("pending")}>
-            <Undo2 className="size-4" /> {t("photos.resetChoice")}
-          </Button>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function EditFields({
-  detection: d,
-  overrides,
-  locId,
-  onChange,
-}: {
-  detection: Detection;
-  overrides: DetectionOverrides;
-  locId: string | null;
-  onChange: (p: DetectionOverrides) => void;
-}) {
-  const { t } = useTranslation();
-  const eff = { ...d.suggested, ...overrides };
-  const [qty, setQty] = useState(String(eff.quantity));
-
-  return (
-    <div
-      className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <Field label={t("items.name")}>
-        {(id) => (
-          <Input id={id} value={eff.name} onChange={(e) => onChange({ name: e.target.value })} />
-        )}
-      </Field>
-      <Field label={t("items.category")}>
-        {(id) => (
-          <CategoryPathField
-            id={id}
-            value={eff.category_path}
-            onChange={(p) => onChange({ category_path: p })}
-          />
-        )}
-      </Field>
-      <Field label={t("items.tags")}>
-        {(id) => <TagInput id={id} value={eff.tags} onChange={(v) => onChange({ tags: v })} />}
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={t("items.quantity")}>
-          {(id) => (
-            <Input
-              id={id}
-              inputMode="decimal"
-              value={qty}
-              onChange={(e) => {
-                setQty(e.target.value);
-                const n = Number(e.target.value.replace(",", "."));
-                if (Number.isFinite(n) && n > 0) onChange({ quantity: n });
-              }}
-            />
-          )}
-        </Field>
-        <Field label={t("items.unit")}>
-          {(id) => (
-            <Input id={id} value={eff.unit} onChange={(e) => onChange({ unit: e.target.value })} />
-          )}
-        </Field>
-      </div>
-      <Field label={t("items.location")}>
-        {(id) => (
-          <LocationSelect
-            id={id}
-            value={locId}
-            onChange={(v) => onChange({ location_id: v ?? undefined })}
-            emptyLabel={t("items.unplaced")}
-          />
-        )}
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={t("items.brand")}>
-          {(id) => (
-            <Input
-              id={id}
-              value={eff.brand ?? ""}
-              onChange={(e) => onChange({ brand: e.target.value })}
-            />
-          )}
-        </Field>
-        <Field label={t("items.model")}>
-          {(id) => (
-            <Input
-              id={id}
-              value={eff.model ?? ""}
-              onChange={(e) => onChange({ model: e.target.value })}
-            />
-          )}
-        </Field>
-      </div>
-      <Field label={t("items.notes")}>
-        {(id) => (
-          <Textarea
-            id={id}
-            rows={2}
-            value={eff.notes ?? ""}
-            onChange={(e) => onChange({ notes: e.target.value })}
-          />
-        )}
-      </Field>
-    </div>
-  );
-}
-
-/** Kategorie: výběr ze stromu, nebo nová cesta zapsaná jako „Nářadí > Ruční“. */
-function CategoryPathField({
-  id,
-  value,
-  onChange,
-}: {
-  id: string;
-  value: string[];
-  onChange: (path: string[]) => void;
-}) {
-  const { t } = useTranslation();
-  const { data: cats = [] } = useCategories();
-  const flat = useMemo(() => flattenTree(cats), [cats]);
-  const paths = useMemo(
-    () => flat.map(({ node }) => ({ node, path: categoryPathOf(node, cats) })),
-    [flat, cats],
-  );
-  const existing = paths.find((p) => pathsEqual(p.path, value));
-  const [newMode, setNewMode] = useState(false);
-  const [text, setText] = useState(pathToText(value));
-  const isNew = newMode || (!existing && value.length > 0);
-
-  return (
-    <div className="space-y-2">
-      <Select
-        id={id}
-        value={isNew ? NEW_CATEGORY : (existing?.node.id ?? "")}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v === NEW_CATEGORY) {
-            setNewMode(true);
-            setText(pathToText(value));
-          } else {
-            setNewMode(false);
-            onChange(v ? (paths.find((p) => p.node.id === v)?.path ?? []) : []);
-          }
-        }}
-      >
-        <option value="">{t("items.noCategory")}</option>
-        {paths.map(({ node, path }) => (
-          <option key={node.id} value={node.id}>
-            {"  ".repeat(path.length - 1)}
-            {node.name}
-          </option>
-        ))}
-        <option value={NEW_CATEGORY}>{t("photos.newCategory")}</option>
-      </Select>
-      {isNew && (
-        <Input
-          aria-label={t("photos.newCategoryPath")}
-          placeholder={t("photos.newCategoryPlaceholder")}
-          value={text}
-          onChange={(e) => {
-            setNewMode(true);
-            setText(e.target.value);
-            onChange(parsePath(e.target.value));
-          }}
-        />
-      )}
     </div>
   );
 }

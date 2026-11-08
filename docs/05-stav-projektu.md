@@ -23,7 +23,9 @@ Vše je sloučené ve větvi **`feat/integrace`** (obsahuje všechny níže uved
 
 | + | Asistent při kontrole nálezů z fotky (`POST /photos/analyses/{id}/refine`): upravuje jen koncept (přijmout / zamítnout / sloučit, názvy, množství, kategorie, umístění vč. nového), každou úpravu jde vrátit, věci se zapíšou až závěrečným potvrzením |
 
-Testy: backend 178, web 123 (vše zelené, lint a typy také).
+| + | Kontrola nálezů z fotky v celé šířce okna: skupiny „Co řešit“ (bez názvu / bez kategorie / bez umístění / hotové), podle umístění, kategorie a rozhodnutí; sbalitelné skupiny i řádky, přesun dialogem (kategorie + umístění, i nové), hromadný výběr a přetahování mezi skupinami |
+
+Testy: backend 178, web 145 (vše zelené, lint a typy také).
 
 ## Jak to spustit (vývoj)
 ```bash
