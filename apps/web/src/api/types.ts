@@ -412,6 +412,27 @@ export interface DetectionOverrides {
   location_path?: string[];
 }
 
+/** Aktuální rozhodnutí o jedné detekci v rozdělané kontrole (pro asistenta). */
+export interface RefineDraftItem {
+  detection_id: string;
+  choice: "pending" | "accept" | "reject" | "merge";
+  overrides?: DetectionOverrides;
+}
+
+/** Návrh úpravy konceptu od asistenta (nic se neukládá, dokud uživatel nepotvrdí nálezy). */
+export interface RefineEdit {
+  detection_id: string;
+  index: number;
+  choice?: "pending" | "accept" | "reject" | "merge";
+  changes: DetectionOverrides;
+  location?: { id: string | null; path: string[]; label: string; is_new: boolean };
+}
+
+export interface RefineResult {
+  reply: string;
+  edits: RefineEdit[];
+}
+
 export interface DetectionDecision {
   detection_id: string;
   action: "accept" | "reject" | "merge";

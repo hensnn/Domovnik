@@ -1,6 +1,16 @@
 import clsx from "clsx";
-import { AlertTriangle, Check, GitMerge, Maximize2, Pencil, Plus, Undo2, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  GitMerge,
+  Maximize2,
+  Pencil,
+  Plus,
+  Sparkles,
+  Undo2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useCategories } from "../../api/hooks";
@@ -9,6 +19,7 @@ import type {
   DetectionDecision,
   DetectionOverrides,
   PhotoAnalysis,
+  RefineEdit,
 } from "../../api/types";
 import { LocationSelect, TagInput } from "../../components/Pickers";
 import { thumbUrl } from "../../components/Thumb";
@@ -16,19 +27,26 @@ import { Badge, Button, Field, Input, Select, Textarea, useToast } from "../../c
 import { flattenTree } from "../../lib/format";
 import {
   type Choice,
+  type ReviewState,
+  type UndoEntry,
   acceptConfident,
+  applyRefineEdits,
   buildDecisions,
+  buildDraft,
   categoryPathOf,
   confidencePercent,
   confidenceTone,
   initialChoice,
+  mergeOverrides,
   parsePath,
   pathToText,
   pathsEqual,
+  revertRefine,
   summarize,
 } from "../../lib/photos";
 
 import PhotoViewer from "./PhotoViewer";
+import ReviewAssistant from "./ReviewAssistant";
 
 const NEW_CATEGORY = "__new__";
 
@@ -54,7 +72,17 @@ export default function ReviewScreen({
   const [overrides, setOverrides] = useState<Record<string, DetectionOverrides>>({});
   const [active, setActive] = useState<string | null>(null);
   const [viewer, setViewer] = useState(false);
+  const [assistant, setAssistant] = useState(false);
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [flash, setFlash] = useState<Set<string>>(new Set());
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  // Poslední stav kontroly pro asistenta (odpověď přijde asynchronně, po dalších úpravách).
+  const latest = useRef<ReviewState>({ choices, overrides, labels });
+  useEffect(() => {
+    latest.current = { choices, overrides, labels };
+  });
+  const flashTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
   const sum = summarize(choices);
   const confidentLeft = dets.filter(
@@ -66,27 +94,37 @@ export default function ReviewScreen({
     if (scroll) cardRefs.current[id]?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   };
 
-  const patchOverrides = (d: Detection, patch: DetectionOverrides) =>
-    setOverrides((all) => {
-      const merged: Record<string, unknown> = { ...all[d.id], ...patch };
-      // hodnoty shodné s návrhem se neposílají
-      const s = d.suggested;
-      const same: Record<string, unknown> = {
-        name: s.name,
-        category_path: s.category_path,
-        tags: s.tags,
-        brand: s.brand ?? "",
-        model: s.model ?? "",
-        quantity: s.quantity,
-        unit: s.unit,
-        notes: s.notes ?? "",
-        location_id: d.suggested_location?.id ?? undefined,
-      };
-      for (const k of Object.keys(merged)) {
-        if (JSON.stringify(merged[k]) === JSON.stringify(same[k])) delete merged[k];
-      }
-      return { ...all, [d.id]: merged as DetectionOverrides };
-    });
+  const patchOverrides = (d: Detection, patch: DetectionOverrides) => {
+    // ruční změna umístění zruší popisek, který nastavil asistent
+    if ("location_id" in patch || "location_path" in patch) {
+      setLabels((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== d.id)));
+    }
+    setOverrides((all) => ({ ...all, [d.id]: mergeOverrides(d, all[d.id] ?? {}, patch) }));
+  };
+
+  const flashCards = (ids: string[]) => {
+    window.clearTimeout(flashTimer.current);
+    setFlash(new Set(ids));
+    flashTimer.current = window.setTimeout(() => setFlash(new Set()), 2500);
+  };
+  const setState = (st: ReviewState) => {
+    latest.current = st;
+    setChoices(st.choices);
+    setOverrides(st.overrides);
+    setLabels(st.labels);
+  };
+  const applyEdits = (edits: RefineEdit[]) => {
+    const r = applyRefineEdits(dets, latest.current, edits);
+    setState(r.next);
+    flashCards(r.touched);
+    if (r.touched[0]) select(r.touched[0], true);
+    const indexes = r.touched.map((id) => dets.findIndex((d) => d.id === id) + 1);
+    return { undo: r.undo, touched: r.touched, indexes };
+  };
+  const undoEdits = (undo: UndoEntry[]) => {
+    setState(revertRefine(latest.current, undo));
+    flashCards(undo.map((u) => u.detection_id));
+  };
 
   const acceptAll = () => {
     const r = acceptConfident(dets, choices);
@@ -116,6 +154,14 @@ export default function ReviewScreen({
         <div className="mt-2 space-y-3 md:mt-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="mr-auto font-semibold">{t("photos.found", { count: dets.length })}</h2>
+            <Button
+              size="sm"
+              aria-pressed={assistant}
+              onClick={() => setAssistant((v) => !v)}
+              disabled={dets.length === 0}
+            >
+              <Sparkles className="size-4" /> {t("photos.assistant.button")}
+            </Button>
             <Button size="sm" onClick={acceptAll} disabled={confidentLeft === 0}>
               <Check className="size-4" /> {t("photos.acceptConfident")}
             </Button>
@@ -140,6 +186,8 @@ export default function ReviewScreen({
                   index={i + 1}
                   choice={choices[d.id] ?? "pending"}
                   overrides={overrides[d.id] ?? {}}
+                  locLabel={labels[d.id]}
+                  flash={flash.has(d.id)}
                   active={active === d.id}
                   onSelect={() => select(d.id, false)}
                   onChoice={(c) => setChoices((all) => ({ ...all, [d.id]: c }))}
@@ -164,6 +212,15 @@ export default function ReviewScreen({
       )}
 
       <div className="sticky bottom-0 -mx-3 mt-4 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur md:-mx-5 md:px-5 dark:border-slate-800 dark:bg-slate-900/95">
+        {assistant && (
+          <ReviewAssistant
+            analysisId={analysis.id}
+            getDraft={() => buildDraft(dets, latest.current)}
+            apply={applyEdits}
+            undo={undoEdits}
+            onClose={() => setAssistant(false)}
+          />
+        )}
         {error && (
           <p role="alert" className="mb-2 text-sm text-red-600">
             {error}
@@ -281,6 +338,8 @@ function DetectionCard({
   index,
   choice,
   overrides,
+  locLabel,
+  flash,
   active,
   onSelect,
   onChoice,
@@ -290,6 +349,10 @@ function DetectionCard({
   index: number;
   choice: Choice;
   overrides: DetectionOverrides;
+  /** čitelný název umístění vybraného asistentem */
+  locLabel?: string;
+  /** krátké zvýraznění po úpravě asistentem */
+  flash: boolean;
   active: boolean;
   onSelect: () => void;
   onChoice: (c: Choice) => void;
@@ -299,7 +362,13 @@ function DetectionCard({
   const [editing, setEditing] = useState(false);
   const eff = { ...d.suggested, ...overrides };
   const tone = confidenceTone(d.confidence);
-  const locId = overrides.location_id ?? d.suggested_location?.id ?? null;
+  const locId = overrides.location_path
+    ? null
+    : (overrides.location_id ?? d.suggested_location?.id ?? null);
+  const newPathText = overrides.location_path?.length
+    ? `${overrides.location_path.join(" › ")} (${t("photos.assistant.newLocation")})`
+    : undefined;
+  const chosenText = locLabel ?? newPathText;
   const locPath =
     d.suggested_location?.path?.join(" › ") ?? d.suggested_location?.full_name ?? undefined;
   const m = d.matched_item;
@@ -314,6 +383,7 @@ function DetectionCard({
         active
           ? "border-brand-500 ring-2 ring-brand-500/30"
           : "border-slate-200 dark:border-slate-800",
+        flash && "ring-2 ring-amber-400",
         choice === "accept" && "border-l-4 border-l-emerald-500",
         choice === "merge" && "border-l-4 border-l-sky-500",
         choice === "reject" && "opacity-60",
@@ -345,7 +415,9 @@ function DetectionCard({
 
       <div className="text-xs text-slate-600 dark:text-slate-400">
         <span className="font-medium">{t("items.location")}:</span>{" "}
-        {overrides.location_id ? (
+        {chosenText ? (
+          chosenText
+        ) : overrides.location_id ? (
           t("photos.locationChosen")
         ) : locPath ? (
           <>

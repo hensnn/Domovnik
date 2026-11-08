@@ -58,6 +58,23 @@ def create_location(db: Session, ctx: ActorContext, data: LocationCreate) -> Loc
     return loc
 
 
+def find_path(db: Session, path: list[str]) -> Location | None:
+    """Aktivní umístění podle cesty názvů od kořene (bez ohledu na velikost písmen); nic nevytváří."""
+    rows = db.execute(select(Location).where(Location.archived_at.is_(None))).scalars().all()
+    parent_id: uuid.UUID | None = None
+    found: Location | None = None
+    for name in path:
+        wanted = name.strip().lower()
+        found = next(
+            (r for r in rows if r.parent_id == parent_id and r.name.strip().lower() == wanted),
+            None,
+        )
+        if found is None:
+            return None
+        parent_id = found.id
+    return found
+
+
 MAX_DUPLICATE_NODES = 500
 
 

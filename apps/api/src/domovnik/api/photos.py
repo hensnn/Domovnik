@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from domovnik.ai import changesets, vision
+from domovnik.ai import refine as refine_mod
 from domovnik.api import deps
 from domovnik.api.deps import RequestCtx
 from domovnik.context import ActorContext, bind_context
@@ -108,6 +109,16 @@ def commit(
         "created_item_ids": [str(i) for i in result.created_item_ids],
         "merged_item_ids": [str(i) for i in result.merged_item_ids],
     }
+
+
+@router.post("/analyses/{analysis_id}/refine")
+def refine(
+    analysis_id: uuid.UUID, body: refine_mod.RefineIn, rc: RequestCtx = Depends(deps.ai_chat)
+) -> dict[str, Any]:
+    """Asistent upravuje koncept kontroly: vrací návrhy úprav (nic se neukládá, schvaluje se až
+    závěrečným potvrzením nálezů)."""
+    _get(rc, analysis_id)
+    return refine_mod.refine(rc.db, analysis_id, body)
 
 
 @router.post("/analyses/{analysis_id}/plan")

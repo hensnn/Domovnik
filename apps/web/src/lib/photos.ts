@@ -6,6 +6,8 @@ import type {
   DetectionDecision,
   DetectionOverrides,
   PhotoAnalysis,
+  RefineDraftItem,
+  RefineEdit,
 } from "../api/types";
 
 /** Hranice jistoty pro „Přijmout vše s jistotou ≥ 80 %“. */
@@ -151,3 +153,130 @@ export function buildDecisions(
 /** Dotazování na výsledek analýzy: každých ~1,5 s, nejdéle ~2 minuty. */
 export const POLL_INTERVAL_MS = 1500;
 export const POLL_TIMEOUT_MS = 120_000;
+
+// --- Úpravy konceptu kontroly (ruční i od asistenta) ---------------------------------------
+
+/**
+ * Sloučí úpravu do přepsaných hodnot detekce. Hodnoty shodné s návrhem z fotky se zahodí
+ * (neposílají se); volba umístění podle id a podle cesty se vzájemně vylučují.
+ */
+export function mergeOverrides(
+  d: Detection,
+  current: DetectionOverrides,
+  patch: DetectionOverrides,
+): DetectionOverrides {
+  const merged: Record<string, unknown> = { ...current, ...patch };
+  if ("location_id" in patch && !("location_path" in patch)) delete merged.location_path;
+  if ("location_path" in patch && !("location_id" in patch)) delete merged.location_id;
+  const s = d.suggested;
+  const same: Record<string, unknown> = {
+    name: s.name,
+    category_path: s.category_path,
+    tags: s.tags,
+    brand: s.brand ?? "",
+    model: s.model ?? "",
+    quantity: s.quantity,
+    unit: s.unit,
+    notes: s.notes ?? "",
+    location_id: d.suggested_location?.id ?? undefined,
+  };
+  for (const k of Object.keys(merged)) {
+    if (JSON.stringify(merged[k]) === JSON.stringify(same[k])) delete merged[k];
+  }
+  return merged as DetectionOverrides;
+}
+
+/** Stav rozdělané kontroly, který asistent upravuje. */
+export interface ReviewState {
+  choices: Record<string, Choice>;
+  overrides: Record<string, DetectionOverrides>;
+  /** čitelný název vybraného umístění podle detekce (jen u úprav od asistenta) */
+  labels: Record<string, string>;
+}
+
+/** Původní hodnoty jedné detekce před úpravou asistenta (pro „Vrátit“). */
+export interface UndoEntry {
+  detection_id: string;
+  choice: Choice;
+  overrides: DetectionOverrides;
+  label: string | undefined;
+}
+
+/**
+ * Použije návrhy asistenta na koncept. Neznámé detekce se přeskočí, `merge` projde jen u
+ * duplicit. Vrací nový stav, údaje pro vrácení a id skutečně změněných detekcí.
+ */
+export function applyRefineEdits(
+  dets: Detection[],
+  state: ReviewState,
+  edits: RefineEdit[],
+): { next: ReviewState; undo: UndoEntry[]; touched: string[] } {
+  const byId = new Map(dets.map((d) => [d.id, d]));
+  const next: ReviewState = {
+    choices: { ...state.choices },
+    overrides: { ...state.overrides },
+    labels: { ...state.labels },
+  };
+  const undo = new Map<string, UndoEntry>();
+  const touched = new Set<string>();
+  for (const e of edits) {
+    const d = byId.get(e.detection_id);
+    if (!d) continue;
+    if (!undo.has(d.id)) {
+      undo.set(d.id, {
+        detection_id: d.id,
+        choice: state.choices[d.id] ?? "pending",
+        overrides: state.overrides[d.id] ?? {},
+        label: state.labels[d.id],
+      });
+    }
+    if (e.choice && (e.choice !== "merge" || d.matched_item)) {
+      next.choices[d.id] = e.choice;
+      touched.add(d.id);
+    }
+    if (e.changes && Object.keys(e.changes).length) {
+      next.overrides[d.id] = mergeOverrides(d, next.overrides[d.id] ?? {}, e.changes);
+      touched.add(d.id);
+    }
+    if (e.location) {
+      next.labels[d.id] = e.location.is_new ? `${e.location.label} (nové)` : e.location.label;
+    }
+  }
+  return {
+    next,
+    undo: [...undo.values()].filter((u) => touched.has(u.detection_id)),
+    touched: [...touched],
+  };
+}
+
+/** Vrátí detekce na hodnoty před úpravou asistenta. */
+export function revertRefine(state: ReviewState, undo: UndoEntry[]): ReviewState {
+  const next: ReviewState = {
+    choices: { ...state.choices },
+    overrides: { ...state.overrides },
+    labels: { ...state.labels },
+  };
+  for (const u of undo) {
+    next.choices[u.detection_id] = u.choice;
+    if (Object.keys(u.overrides).length) next.overrides[u.detection_id] = u.overrides;
+    else delete next.overrides[u.detection_id];
+    if (u.label !== undefined) next.labels[u.detection_id] = u.label;
+    else delete next.labels[u.detection_id];
+  }
+  return next;
+}
+
+/** Koncept pro asistenta: rozhodnutí a přepsané hodnoty všech detekcí. */
+export function buildDraft(
+  dets: Detection[],
+  state: Pick<ReviewState, "choices" | "overrides">,
+): RefineDraftItem[] {
+  return dets.map((d) => {
+    const o = state.overrides[d.id];
+    return {
+      detection_id: d.id,
+      choice: state.choices[d.id] ?? "pending",
+      ...(o && Object.keys(o).length ? { overrides: o } : {}),
+    };
+  });
+}

@@ -22,6 +22,8 @@ import type {
   LocationKind,
   Movement,
   PhotoAnalysis,
+  RefineDraftItem,
+  RefineResult,
   SearchResults,
   SearchScope,
   SettingDef,
@@ -183,6 +185,14 @@ export const api_ = {
     post<Location>(`/locations/${id}/duplicate`, body),
   duplicateCategory: (id: string, body: { name?: string; include_children: boolean }) =>
     post<Category>(`/categories/${id}/duplicate`, body),
+  refineAnalysis: (
+    analysisId: string,
+    body: {
+      text: string;
+      draft: RefineDraftItem[];
+      history: { role: "user" | "assistant"; text: string }[];
+    },
+  ) => post<RefineResult>(`/photos/analyses/${analysisId}/refine`, body),
   createKnowledge: (body: {
     title: string;
     content: string;

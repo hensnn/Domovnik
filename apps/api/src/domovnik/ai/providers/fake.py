@@ -159,6 +159,26 @@ class DemoProvider(FakeProvider):
         if json_schema is not None:
             if "steps" in json_schema.get("properties", {}):
                 return text(json.dumps(DEMO_PLAN, ensure_ascii=False))
+            if "edits" in json_schema.get("properties", {}):
+                # úpravy konceptu kontroly: umí jen „přijmi vše“ (ladění UI)
+                body = messages[-1].content
+                n = 0
+                if "Aktuální koncept (data):\n" in body:
+                    try:
+                        n = len(json.loads(body.split("Aktuální koncept (data):\n", 1)[1]))
+                    except ValueError:
+                        n = 0
+                if "přijmi" in body.lower() and n:
+                    edits = [{"index": i, "choice": "accept"} for i in range(1, n + 1)]
+                    return text(
+                        json.dumps({"reply": "Přijal jsem vše. (testovací režim)", "edits": edits})
+                    )
+                return text(
+                    json.dumps(
+                        {"reply": "Testovací režim umí jen „přijmi vše“.", "edits": []},
+                        ensure_ascii=False,
+                    )
+                )
             return text(json.dumps(DEMO_DETECTIONS, ensure_ascii=False))
         last = messages[-1]
         if last.role == "tool":

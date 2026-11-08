@@ -21,7 +21,9 @@ Vše je sloučené ve větvi **`feat/integrace`** (obsahuje všechny níže uved
 | + | Instalace do telefonu (PWA): tlačítko „Nainstalovat aplikaci“ (postranní menu, Více), pruh na telefonu, návod pro Android / iPhone / počítač; vyžaduje HTTPS s důvěryhodným certifikátem |
 | + | Duplikování věcí (předvyplněný formulář), umístění a kategorií (`POST /locations/{id}/duplicate`, `POST /categories/{id}/duplicate`; kopíruje se struktura, ne věci a fotky) |
 
-Testy: backend 174, web 107 (vše zelené, lint a typy také).
+| + | Asistent při kontrole nálezů z fotky (`POST /photos/analyses/{id}/refine`): upravuje jen koncept (přijmout / zamítnout / sloučit, názvy, množství, kategorie, umístění vč. nového), každou úpravu jde vrátit, věci se zapíšou až závěrečným potvrzením |
+
+Testy: backend 178, web 123 (vše zelené, lint a typy také).
 
 ## Jak to spustit (vývoj)
 ```bash

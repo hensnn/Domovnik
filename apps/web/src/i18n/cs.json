@@ -736,6 +736,21 @@
     "intro": "Vyfoť polici, krabici nebo šuplík. Asistent rozpozná věci na snímku a navrhne, co založit. Nic se neuloží, dokud to nepotvrdíš.",
     "pickPhoto": "Vybrat z galerie",
     "photoAlt": "Nahraná fotka",
+    "assistant": {
+      "button": "Upravit s asistentem",
+      "title": "Asistent kontroly",
+      "close": "Zavřít asistenta",
+      "log": "Konverzace s asistentem",
+      "intro": "Nemusí to být hned dokonalé: řekni asistentovi, co upravit („č. 2 je šroubovák“, „všechno dej do Police 2“). Nic se neuloží, dokud na konci nepotvrdíš.",
+      "placeholder": "Napiš nebo nadiktuj, co upravit…",
+      "q1": "Přijmi všechny s jistotou nad 80 %",
+      "q2": "Zamítni nejisté nálezy (pod 50 %)",
+      "q3": "Sluč duplicity s existujícími věcmi",
+      "changed": "Změněno: {{items}}",
+      "undo": "Vrátit",
+      "undone": "Vráceno",
+      "newLocation": "nové"
+    },
     "viewer": {
       "title": "Detail fotky",
       "enlarge": "Zvětšit fotku",
