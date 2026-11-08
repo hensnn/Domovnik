@@ -330,6 +330,23 @@ class AiConversation(Base):
     updated_at: Mapped[datetime] = _now()
 
 
+class AiKnowledge(Base):
+    """Záznam knihovny znalostí pro AI (pravidla uspořádání, zvyky domácnosti)."""
+
+    __tablename__ = "ai_knowledge"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    title: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)
+    topic: Mapped[str] = mapped_column(Text, server_default="other")
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
+    source: Mapped[str] = mapped_column(Text, server_default="admin")
+    sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _updated()
+    version: Mapped[int] = _version()
+
+
 class AiMessage(Base):
     __tablename__ = "ai_messages"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)

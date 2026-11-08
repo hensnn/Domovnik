@@ -63,6 +63,23 @@ export interface Category {
   full_name: string | null;
 }
 
+export type KnowledgeTopic = "household" | "rules" | "naming" | "other";
+
+/** Záznam knihovny znalostí pro AI (pravidla uspořádání, zvyky domácnosti). */
+export interface Knowledge {
+  id: string;
+  title: string;
+  content: string;
+  topic: KnowledgeTopic;
+  enabled: boolean;
+  source: "admin" | "ai";
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  version: number;
+}
+
 export interface Tag {
   id: string;
   name: string;

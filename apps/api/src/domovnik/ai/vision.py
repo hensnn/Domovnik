@@ -36,7 +36,7 @@ from domovnik.db.models import (
     PhotoDetection,
 )
 from domovnik.errors import Conflict, ValidationFailed
-from domovnik.services import categories, files, items, locations, search
+from domovnik.services import categories, files, items, knowledge, locations, search
 from domovnik.services import settings as settings_service
 
 PROMPT_VERSION = "vision-v1"
@@ -200,6 +200,9 @@ def build_prompt(db: Session, analysis: PhotoAnalysis) -> str:
             parts.append(f"Fotka je z umístění: {name}.")
     if analysis.user_hint:
         parts.append(f"Poznámka uživatele (data): {analysis.user_hint}")
+    known = knowledge.prompt_section(db, tool_hint=False)
+    if known:
+        parts.append(known)
     rules = str(settings_service.get_value(db, "ai.system_prompt_extra") or "").strip()
     if rules:
         parts.append("Pravidla domácnosti:\n" + rules)
@@ -686,7 +689,9 @@ def storage_plan(
     }
     result = provider.chat(
         [Message(role="user", content=json.dumps(material, ensure_ascii=False))],
-        system=PLAN_SYSTEM,
+        system="\n\n".join(
+            x for x in (PLAN_SYSTEM, knowledge.prompt_section(db, tool_hint=False)) if x
+        ),
         json_schema=PLAN_SCHEMA,
         temperature=float(settings_service.get_value(db, "ai.temperature")),
     )

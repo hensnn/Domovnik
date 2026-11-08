@@ -379,6 +379,42 @@ class TagMerge(BaseModel):
     target_id: uuid.UUID
 
 
+# --- Knihovna znalostí pro AI -----------------------------------------------------------------
+
+KnowledgeTopic = Literal["household", "rules", "naming", "other"]
+
+
+class KnowledgeCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=2000)
+    topic: KnowledgeTopic = "other"
+    enabled: bool = True
+    sort_order: int = 0
+
+
+class KnowledgeUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    content: str | None = Field(default=None, min_length=1, max_length=2000)
+    topic: KnowledgeTopic | None = None
+    enabled: bool | None = None
+    sort_order: int | None = None
+    version: int | None = None  # optimistické zamykání
+
+
+class KnowledgeOut(ORM):
+    id: uuid.UUID
+    title: str
+    content: str
+    topic: KnowledgeTopic
+    enabled: bool
+    source: Literal["admin", "ai"]
+    sort_order: int
+    created_by: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+    version: int
+
+
 class BulkRequest(BaseModel):
     """Hromadná operace nad více věcmi."""
 

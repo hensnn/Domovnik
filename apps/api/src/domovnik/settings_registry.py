@@ -288,6 +288,26 @@ REGISTRY: dict[str, SettingDef] = _d(
         description="ask = vždy potvrdit; auto_small = drobnosti automaticky; auto_all = vše s možností vrátit.",
     ),
     SettingDef(
+        "ai.knowledge_enabled",
+        "bool",
+        True,
+        "ai",
+        "Používat knihovnu znalostí",
+        description="AI dostává zapnuté záznamy knihovny (pravidla uspořádání, zvyky domácnosti) "
+        "a neptá se na ně znovu.",
+    ),
+    SettingDef(
+        "ai.knowledge_max_chars",
+        "int",
+        4000,
+        "ai",
+        "Max. velikost znalostí v promptu (znaky)",
+        description="Delší knihovna se do promptu nevejde celá; zbytek si AI dohledá nástrojem. "
+        "Víc znaků = víc tokenů při každém dotazu (pozor na limity free tieru).",
+        min=500,
+        max=20000,
+    ),
+    SettingDef(
         "ai.bulk_threshold",
         "int",
         5,

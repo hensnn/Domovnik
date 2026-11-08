@@ -5,6 +5,7 @@ import AssistantPage from "./features/assistant/AssistantPage";
 import CategoriesPage from "./features/categories/CategoriesPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import InventoryPage from "./features/inventory/InventoryPage";
+import KnowledgePage from "./features/knowledge/KnowledgePage";
 import ItemsPage from "./features/items/ItemsPage";
 import LocationsPage from "./features/locations/LocationsPage";
 import AddFromPhotoPage from "./features/photos/AddFromPhotoPage";
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="add-photo" element={<AddFromPhotoPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="tags" element={<TagsPage />} />
+        <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="scan" element={<ScanPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:id" element={<InventoryPage />} />

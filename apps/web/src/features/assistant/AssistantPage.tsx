@@ -231,7 +231,16 @@ export default function AssistantPage({
         void qc.invalidateQueries({ queryKey: ["ai", "conversations"] });
         void qc.invalidateQueries({ queryKey: ["ai", "status"] });
         if (sawChange) {
-          for (const k of ["items", "item", "locations", "categories", "tags", "stats", "search"])
+          for (const k of [
+            "items",
+            "item",
+            "locations",
+            "categories",
+            "tags",
+            "knowledge",
+            "stats",
+            "search",
+          ])
             void qc.invalidateQueries({ queryKey: [k] });
         }
         if (reply && shouldSpeak(prefs, viaVoice)) {

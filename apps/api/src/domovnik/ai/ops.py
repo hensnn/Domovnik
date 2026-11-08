@@ -14,18 +14,19 @@ from pydantic import BaseModel, Field, TypeAdapter
 from sqlalchemy.orm import Session
 
 from domovnik.context import ActorContext
-from domovnik.db.models import Category, Item, ItemPlacement, Location
+from domovnik.db.models import Category, Item, ItemPlacement, Location, User
 from domovnik.errors import ValidationFailed
 from domovnik.schemas import (
     CategoryCreate,
     CategoryUpdate,
     ItemCreate,
     ItemUpdate,
+    KnowledgeCreate,
     LocationCreate,
     LocationUpdate,
     PlacementIn,
 )
-from domovnik.services import categories, items, locations
+from domovnik.services import categories, items, knowledge, locations
 from domovnik.services import tags as tag_service
 
 SEP = " › "
@@ -45,6 +46,10 @@ class CreateItemOp(_Op):
     category_path: list[str] | None = Field(default=None, description="např. ['Nářadí','Ruční']")
     location_id: uuid.UUID | None = None
     location_path: list[str] | None = Field(default=None, description="např. ['Dům','Garáž']")
+    unplaced: bool = Field(
+        default=False,
+        description="true jen když uživatel výslovně chce věc BEZ umístění",
+    )
     quantity: Decimal = Field(default=Decimal(1), gt=0)
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
@@ -176,7 +181,19 @@ class RemoveTagOp(_Op):
     tag: str
 
 
+class AddKnowledgeOp(_Op):
+    op: Literal["add_knowledge"]
+    title: str = Field(min_length=1, max_length=200, description="krátký název pravidla / znalosti")
+    content: str = Field(min_length=1, max_length=2000, description="znění pravidla, srozumitelně")
+    topic: Literal["household", "rules", "naming", "other"] = "other"
+
+
 # jen pro inverzní operace (undo) – AI je navrhovat nesmí
+class DeleteKnowledgeOp(_Op):
+    op: Literal["delete_knowledge"]
+    knowledge_id: uuid.UUID
+
+
 class RestoreItemOp(_Op):
     op: Literal["restore_item"]
     item_id: uuid.UUID
@@ -214,7 +231,8 @@ ProposableOp = Annotated[
     | MergeCategoriesOp
     | DeleteCategoryOp
     | AddTagOp
-    | RemoveTagOp,
+    | RemoveTagOp
+    | AddKnowledgeOp,
     Field(discriminator="op"),
 ]
 AnyOp = Annotated[
@@ -236,16 +254,26 @@ AnyOp = Annotated[
     | RestoreItemOp
     | RemoveFromLocationOp
     | DeleteLocationOp
-    | UnarchiveLocationOp,
+    | UnarchiveLocationOp
+    | AddKnowledgeOp
+    | DeleteKnowledgeOp,
     Field(discriminator="op"),
 ]
 PROPOSABLE = TypeAdapter(ProposableOp)
 ANY_OP = TypeAdapter(AnyOp)
 
 # Operace s větším dopadem: vyžadují potvrzení i při vyšší důvěře
-RISKY = {"delete_item", "merge_categories", "delete_category", "archive_location", "move_location"}
-# Operace, které AI nikdy nesmí provést bez potvrzení v UI (ani v hlasovém režimu)
-NEVER_AUTO = {"delete_item", "delete_category", "merge_categories"}
+RISKY = {
+    "delete_item",
+    "merge_categories",
+    "delete_category",
+    "archive_location",
+    "move_location",
+    "add_knowledge",
+}
+# Operace, které AI nikdy nesmí provést bez potvrzení v UI (ani v hlasovém režimu).
+# `add_knowledge` patří sem, protože uložený text se vkládá do promptu při každém dotazu.
+NEVER_AUTO = {"delete_item", "delete_category", "merge_categories", "add_knowledge"}
 
 
 def parse_op(data: dict[str, Any], *, internal: bool = False) -> Any:
@@ -434,6 +462,10 @@ def describe(db: Session, op: BaseModel) -> str:
             return f"Odebrat tag „{op.tag}“ z {_item_name(db, op.item_id)}"
         case RestoreItemOp():
             return f"Obnovit {_item_name(db, op.item_id)}"
+        case AddKnowledgeOp():
+            return f"Uložit do knihovny znalostí: „{op.title}“ – {op.content[:160]}"
+        case DeleteKnowledgeOp():
+            return "Odebrat záznam z knihovny znalostí"
         case _:
             return op.__class__.__name__
 
@@ -708,6 +740,22 @@ def execute(
             return item.id, _inverse(
                 "remove_tag" if adding else "add_tag", item_id=item.id, tag=op.tag
             )
+
+        case AddKnowledgeOp():
+            # Záznam od AI zapne rovnou jen admin; od ostatních čeká na schválení v knihovně.
+            actor = db.get(User, ctx.actor_id) if ctx.actor_id else None
+            row = knowledge.create_entry(
+                db,
+                ctx,
+                KnowledgeCreate(title=op.title, content=op.content, topic=op.topic),
+                source="ai",
+                enabled=actor is not None and actor.role == "admin",
+            )
+            return row.id, _inverse("delete_knowledge", knowledge_id=row.id)
+
+        case DeleteKnowledgeOp():
+            knowledge.delete_entry(db, ctx, op.knowledge_id)
+            return op.knowledge_id, None
 
         case _:
             raise ValidationFailed(f"Nepodporovaná operace {op.__class__.__name__}.")

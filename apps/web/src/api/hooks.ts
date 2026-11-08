@@ -15,6 +15,8 @@ import type {
   FileRole,
   Item,
   ItemFilters,
+  Knowledge,
+  KnowledgeTopic,
   ItemPage,
   Location,
   LocationKind,
@@ -41,6 +43,9 @@ export const useCategories = () =>
   useQuery({ queryKey: ["categories"], queryFn: () => get<Category[]>("/categories") });
 
 export const useTags = () => useQuery({ queryKey: ["tags"], queryFn: () => get<Tag[]>("/tags") });
+
+export const useKnowledge = () =>
+  useQuery({ queryKey: ["knowledge"], queryFn: () => get<Knowledge[]>("/knowledge") });
 
 export const useItems = (filters: ItemFilters) =>
   useQuery({
@@ -128,6 +133,7 @@ export function useInvalidateData() {
       "location-files",
       "categories",
       "tags",
+      "knowledge",
       "stats",
       "search",
     ]) {
@@ -173,6 +179,23 @@ export const api_ = {
     post<Category>(`/categories/${id}/merge`, { target_id: targetId }),
   deleteCategory: (id: string, reassignTo?: string) =>
     del<void>(`/categories/${id}`, { reassign_to: reassignTo }),
+  createKnowledge: (body: {
+    title: string;
+    content: string;
+    topic: KnowledgeTopic;
+    enabled: boolean;
+  }) => post<Knowledge>("/knowledge", body),
+  updateKnowledge: (
+    id: string,
+    body: Partial<{ title: string; content: string; topic: KnowledgeTopic; enabled: boolean }>,
+    version?: number,
+  ) =>
+    patch<Knowledge>(
+      `/knowledge/${id}`,
+      body,
+      version ? { "If-Match": `"${version}"` } : undefined,
+    ),
+  deleteKnowledge: (id: string) => del<void>(`/knowledge/${id}`),
   createTag: (body: { name: string; color?: string | null }) => post<Tag>("/tags", body),
   /** `color: null` barvu odstraní; neuvedené pole se nemění. */
   updateTag: (id: string, body: { name?: string; color?: string | null }) =>

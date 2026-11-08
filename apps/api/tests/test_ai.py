@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from domovnik.ai import agent, changesets
 from domovnik.ai import ops as ops_mod
+from domovnik.ai import tools as tools_mod
 from domovnik.ai.providers import override_provider
 from domovnik.ai.providers.fake import FakeProvider, call, text
 from domovnik.context import ActorContext
@@ -520,3 +521,99 @@ def test_ai_http_endpoints(clean_db: None) -> None:
             v.post(f"/api/v1/ai/change-sets/{uuid.uuid4()}/apply", json={}, headers=vh).status_code
             == 403
         )
+
+
+# --- výchozí umístění „Jsem tady“ ---------------------------------------------------------------
+
+
+def _placed_in(db: Session, name: str) -> list[uuid.UUID]:
+    item = db.execute(select(Item).where(Item.name == name)).scalar_one()
+    return [
+        p.location_id
+        for p in db.execute(select(ItemPlacement).where(ItemPlacement.item_id == item.id)).scalars()
+    ]
+
+
+def test_here_is_default_for_new_items_and_moves_without_asking(
+    db: Session,
+    ctx: ActorContext,
+    user,  # type: ignore[no-untyped-def]
+) -> None:
+    garaz, dilna, kladivo = seed_home(db, ctx)
+    settings_service.set_value(db, ctx, "ai.trust_level", "auto_all", actor_is_admin=True)
+    ops = [
+        {"op": "create_item", "name": "Pilník"},  # bez místa → „tady“
+        {"op": "create_item", "name": "Kleště", "location_path": ["Dům", "Dílna"]},  # výslovně
+        {"op": "create_item", "name": "Bez místa", "unplaced": True},  # výslovně bez místa
+        {"op": "move_item", "item_id": str(kladivo.id)},  # bez cíle → „tady“
+    ]
+    res, _ = run(
+        db,
+        ctx,
+        user,
+        [call("propose_changes", summary="Pár věcí", operations=ops), text("Hotovo.")],
+        context_location="Dům › Dílna",
+        context_location_id=dilna.id,
+    )
+    assert res.change_sets[0]["status"] == "applied"
+    assert _placed_in(db, "Pilník") == [dilna.id]
+    assert _placed_in(db, "Kleště") == [dilna.id]  # cesta i „tady“ jsou Dílna
+    assert _placed_in(db, "Bez místa") == []
+    assert [p for p in _placed_in(db, "Kladivo")] == [dilna.id]  # přesun bez cíle → Dílna
+    assert garaz.id not in _placed_in(db, "Kladivo")
+
+
+def test_explicit_location_beats_here_and_tool_reports_defaults(
+    db: Session,
+    ctx: ActorContext,
+    user,  # type: ignore[no-untyped-def]
+) -> None:
+    garaz, dilna, _ = seed_home(db, ctx)
+    rt = tools_mod.ToolRuntime(
+        db=db,
+        ctx=ctx,
+        user_id=user.id,
+        can_write=True,
+        context_location_id=dilna.id,
+        context_location="Dům › Dílna",
+    )
+    out = rt.call(
+        "propose_changes",
+        {
+            "summary": "x",
+            "operations": [
+                {"op": "create_item", "name": "A", "location_id": str(garaz.id)},
+                {"op": "create_item", "name": "B"},
+            ],
+        },
+    )
+    assert "Dům › Dílna" in out["defaults"] and "1 operací" in out["defaults"]
+    rows = changesets.operations(db, uuid.UUID(out["change_set_id"]))
+    assert rows[0].payload["location_id"] == str(garaz.id)  # výslovné místo se nepřepsalo
+    assert rows[1].payload["location_id"] == str(dilna.id)
+
+
+def test_without_here_nothing_is_filled_in(db: Session, ctx: ActorContext, user) -> None:  # type: ignore[no-untyped-def]
+    seed_home(db, ctx)
+    rt = tools_mod.ToolRuntime(db=db, ctx=ctx, user_id=user.id, can_write=True)
+    out = rt.call(
+        "propose_changes", {"summary": "x", "operations": [{"op": "create_item", "name": "C"}]}
+    )
+    assert "defaults" not in out
+    row = changesets.operations(db, uuid.UUID(out["change_set_id"]))[0]
+    assert "location_id" not in row.payload or row.payload["location_id"] is None
+
+
+def test_prompt_makes_here_the_default_and_forbids_asking(
+    db: Session,
+    ctx: ActorContext,
+    user,  # type: ignore[no-untyped-def]
+) -> None:
+    prompt = agent.build_system_prompt(
+        db, user_id=user.id, voice=False, context_location="Dům › Garáž › Regál A"
+    )
+    assert "Dům › Garáž › Regál A" in prompt
+    assert "VÝCHOZÍ" in prompt and "NEPTEJ se, kam" in prompt
+    assert "výslovně" in prompt
+    none = agent.build_system_prompt(db, user_id=user.id, voice=False, context_location=None)
+    assert "Jsem tady" not in none and "VÝCHOZÍ" not in none

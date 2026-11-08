@@ -116,6 +116,7 @@ def _worker(
                 conversation_id=conversation_id,
                 channel=channel,
                 context_location=names.get(context_location_id) if context_location_id else None,
+                context_location_id=context_location_id,
                 on_event=q.put,
             )
             db.commit()
@@ -195,6 +196,7 @@ def ask(body: AskIn, request: Request, rc: RequestCtx = Depends(deps.ai_chat)) -
         conversation_id=body.conversation_id,
         channel=channel,
         context_location=_context_text(rc, body.context_location_id),
+        context_location_id=body.context_location_id,
     )
     rc.commit()
     return {

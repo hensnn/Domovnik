@@ -18,7 +18,7 @@ from domovnik.context import ActorContext
 from domovnik.db.models import AiChangeSet, ItemPlacement
 from domovnik.errors import DomainError, ValidationFailed
 from domovnik.schemas import ItemOut
-from domovnik.services import categories, embeddings, items, locations, search, stats
+from domovnik.services import categories, embeddings, items, knowledge, locations, search, stats
 from domovnik.services import settings as settings_service
 from domovnik.services.search import ItemFilter
 
@@ -71,6 +71,7 @@ def _schema_from_models() -> dict[str, Any]:
         ops_mod.DeleteCategoryOp,
         ops_mod.AddTagOp,
         ops_mod.RemoveTagOp,
+        ops_mod.AddKnowledgeOp,
     ):
         for name, prop in model.model_json_schema()["properties"].items():
             if name == "op":
@@ -96,6 +97,7 @@ def _schema_from_models() -> dict[str, Any]:
             "delete_category",
             "add_tag",
             "remove_tag",
+            "add_knowledge",
         ],
     }
     return {"type": "object", "properties": props, "required": ["op"]}
@@ -123,9 +125,9 @@ def _simplify(prop: dict[str, Any]) -> dict[str, Any]:
 
 OPERATIONS_HELP = """\
 Operace v propose_changes (každá je objekt s polem "op" a jeho parametry):
-- create_item: name, [category_path|category_id], [location_path|location_id], quantity, tags, aliases, notes, brand, model, unit, is_consumable
+- create_item: name, [category_path|category_id], [location_path|location_id], quantity, tags, aliases, notes, brand, model, unit, is_consumable (bez uvedeného umístění se použije místo „Jsem tady“; věc bez umístění jen s unplaced=true na výslovné přání)
 - update_item: item_id + měněná pole (name, notes, brand, model, status, category_path|category_id, aliases, tags, add_tags, remove_tags)
-- move_item: item_id, to_location_path|to_location_id, [from_location_id], [quantity]
+- move_item: item_id, to_location_path|to_location_id (bez cíle = místo „Jsem tady“), [from_location_id], [quantity]
 - set_quantity: item_id, location_id, quantity (přesný počet, 0 = pryč z umístění)
 - delete_item: item_id (přesune do koše; vždy vyžaduje potvrzení v aplikaci)
 - create_location: name, [parent_path|parent_id], kind, [is_movable]
@@ -137,6 +139,7 @@ Operace v propose_changes (každá je objekt s polem "op" a jeho parametry):
 - merge_categories: source_id, target_id (vyžaduje potvrzení v aplikaci)
 - delete_category: category_id, [reassign_to] (vyžaduje potvrzení v aplikaci)
 - add_tag / remove_tag: item_id, tag
+- add_knowledge: title, content, [topic: household|rules|naming|other] (uloží trvale platné pravidlo domácnosti do knihovny znalostí; vždy vyžaduje potvrzení v aplikaci)
 Cesty (path) jsou seznamy názvů od kořene, např. ["Dům","Garáž","Regál A"]; neexistující se vytvoří."""
 
 
@@ -207,6 +210,12 @@ def tool_specs(*, can_write: bool, voice_confirm: bool) -> list[ToolSpec]:
             },
         ),
         ToolSpec(
+            "search_knowledge",
+            "Hledá v knihovně znalostí o domácnosti (pravidla uspořádání, zvyky). Použij dřív, než "
+            "se uživatele zeptáš na pravidlo nebo zvyk; prázdný dotaz vypíše začátek knihovny.",
+            {"type": "object", "properties": {"query": {"type": "string"}}},
+        ),
+        ToolSpec(
             "get_stats",
             "Souhrn: počty věcí, nezařazené, docházející zásoby, končící záruky.",
             {"type": "object", "properties": {}},
@@ -255,6 +264,9 @@ class ToolRuntime:
     can_write: bool
     conversation_id: uuid.UUID | None = None
     voice: bool = False
+    # Kde uživatel právě je („Jsem tady“): výchozí umístění pro věci a přesuny bez uvedeného místa
+    context_location_id: uuid.UUID | None = None
+    context_location: str | None = None
     change_sets: list[dict[str, Any]] = field(default_factory=list)
 
     def call(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -372,6 +384,17 @@ class ToolRuntime:
             ]
         }
 
+    def _t_search_knowledge(self, query: str = "") -> dict[str, Any]:
+        if not knowledge.enabled_in_settings(self.db):
+            return {"entries": [], "note": "Knihovna znalostí je vypnutá."}
+        found = knowledge.search_entries(self.db, query)
+        return {
+            "entries": [
+                {"title": e.title, "topic": knowledge.TOPIC_LABELS[e.topic], "content": e.content}
+                for e in found
+            ]
+        }
+
     def _t_get_stats(self) -> dict[str, Any]:
         d = stats.dashboard(self.db)
         return {
@@ -383,9 +406,40 @@ class ToolRuntime:
 
     # --- zápis (jen návrh) -----------------------------------------------------------------
 
+    def _apply_context_defaults(self, operations: list[dict[str, Any]]) -> int:
+        """Doplní místo „Jsem tady“ tam, kde chybí cíl: nová věc bez umístění a přesun bez cíle.
+
+        Výslovně uvedené umístění (cesta i id) se nikdy nepřepisuje; věc bez umístění vznikne
+        jen s `unplaced: true`.
+        """
+        if self.context_location_id is None:
+            return 0
+        here = str(self.context_location_id)
+        filled = 0
+        for o in operations:
+            if not isinstance(o, dict):
+                continue
+            if (
+                o.get("op") == "create_item"
+                and not o.get("unplaced")
+                and not o.get("location_id")
+                and not o.get("location_path")
+            ):
+                o["location_id"] = here
+                filled += 1
+            elif (
+                o.get("op") == "move_item"
+                and not o.get("to_location_id")
+                and not o.get("to_location_path")
+            ):
+                o["to_location_id"] = here
+                filled += 1
+        return filled
+
     def _t_propose_changes(self, summary: str, operations: list[dict[str, Any]]) -> dict[str, Any]:
         if not self.can_write:
             raise ValidationFailed("Uživatel nemá oprávnění měnit data.")
+        filled = self._apply_context_defaults(operations)
         cs = changesets.propose(
             self.db,
             self.ctx,
@@ -404,6 +458,11 @@ class ToolRuntime:
             "status": cs.status,
             "operations": [o["description"] for o in described["operations"]],
         }
+        if filled:
+            out["defaults"] = (
+                f"U {filled} operací chybělo umístění, doplnil jsem „{self.context_location}“ "
+                "(místo „Jsem tady“). Zmiň to uživateli jednou větou."
+            )
         if cs.status == "failed":
             out["error"] = next(
                 (o["error"] for o in described["operations"] if o["error"]), "chyba"
