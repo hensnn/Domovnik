@@ -98,12 +98,18 @@ interface AssistantPageProps {
   examples?: string[];
   /** Krátká nápověda nad ukázkami v prázdné konverzaci. */
   hint?: string;
+  /**
+   * Umístění, které má uživatel právě otevřené na stránce, odkud se asistent spustil.
+   * Předvyplní „Jsem tady“ jen v tomto panelu (globální „Jsem tady“ se nemění).
+   */
+  contextLocationId?: string | null;
 }
 
 export default function AssistantPage({
   embedded = false,
   examples,
   hint,
+  contextLocationId,
 }: AssistantPageProps = {}) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -126,7 +132,15 @@ export default function AssistantPage({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Conversation | null>(null);
   const [speaking, setSpeaking] = useState(false);
-  const [currentLoc, setCurrentLoc] = useCurrentLocation();
+  const [globalLoc, setGlobalLoc] = useCurrentLocation();
+  // V panelu u stránky se „Jsem tady“ předvyplní umístěním, které uživatel právě prohlíží
+  // (když žádné není otevřené, platí obvyklé „Jsem tady“). Změna v panelu je jen místní.
+  const [panelLoc, setPanelLoc] = useState<string | null>(() =>
+    contextLocationId !== undefined ? (contextLocationId ?? globalLoc) : null,
+  );
+  const panelOwnsLoc = contextLocationId !== undefined;
+  const currentLoc = panelOwnsLoc ? panelLoc : globalLoc;
+  const setCurrentLoc = panelOwnsLoc ? setPanelLoc : setGlobalLoc;
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const openToken = useRef(0);

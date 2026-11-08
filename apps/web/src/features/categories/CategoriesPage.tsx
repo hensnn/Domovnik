@@ -183,13 +183,36 @@ function Row({
             <span className="size-1 rounded-full bg-slate-300" />
           )}
         </button>
-        <Link
-          to={`/items?category_id=${c.id}`}
-          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
-        >
-          <span className="truncate font-medium">{c.name}</span>
-          <span className="text-xs text-slate-400">{c.item_count}</span>
-        </Link>
+        {has ? (
+          // Kategorie s podkategoriemi: klepnutí na název větev rozbalí / sbalí,
+          // věci kategorie otevře odkaz s počtem.
+          <div className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm">
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((o) => !o)}
+              className="min-w-0 truncate text-left font-medium"
+            >
+              {c.name}
+            </button>
+            <Link
+              to={`/items?category_id=${c.id}`}
+              title={t("categories.showItems")}
+              aria-label={t("categories.showItemsOf", { name: c.name })}
+              className="text-xs text-slate-400 hover:text-brand-700 hover:underline"
+            >
+              {c.item_count}
+            </Link>
+          </div>
+        ) : (
+          <Link
+            to={`/items?category_id=${c.id}`}
+            className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
+          >
+            <span className="truncate font-medium">{c.name}</span>
+            <span className="text-xs text-slate-400">{c.item_count}</span>
+          </Link>
+        )}
         {canWrite && (
           <div className="flex gap-0.5">
             <Button

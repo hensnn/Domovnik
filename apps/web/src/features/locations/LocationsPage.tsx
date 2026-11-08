@@ -76,6 +76,8 @@ export default function LocationsPage() {
   const { data, isPending } = useLocations(showArchived);
   const [form, setForm] = useState<null | { edit?: Location; parent?: string | null }>(null);
   const [assistOpen, setAssistOpen] = useState(false);
+  // umístění, které je při otevření asistenta právě otevřené (nebo rodič zakládaného)
+  const [assistHere, setAssistHere] = useState<string | null>(null);
   const tree = useMemo(() => buildTree(data ?? []), [data]);
   const selected = data?.find((l) => l.id === id);
 
@@ -114,7 +116,13 @@ export default function LocationsPage() {
           <h1 className="mr-auto text-xl font-bold">{t("nav.locations")}</h1>
           {can("items:write") && (
             <>
-              <Button size="sm" onClick={() => setAssistOpen(true)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAssistHere(selected?.id ?? null);
+                  setAssistOpen(true);
+                }}
+              >
                 <Sparkles className="size-4" /> {t("nav.assistant")}
               </Button>
               <Button variant="primary" size="sm" onClick={() => setForm({ parent: null })}>
@@ -189,6 +197,7 @@ export default function LocationsPage() {
           {...form}
           onClose={() => setForm(null)}
           onAssist={() => {
+            setAssistHere(form.parent ?? selected?.id ?? null);
             setForm(null);
             setAssistOpen(true);
           }}
@@ -197,6 +206,7 @@ export default function LocationsPage() {
       <AssistantDrawer
         open={assistOpen}
         onClose={() => setAssistOpen(false)}
+        contextLocationId={assistHere}
         hint={t("locations.assistHint")}
         examples={[t("locations.assistEx1"), t("locations.assistEx2"), t("locations.assistEx3")]}
       />
@@ -333,6 +343,10 @@ function TreeRow({
         <Link
           to={`/locations/${loc.id}`}
           draggable={false}
+          // Klepnutí na řádek větev rozbalí; opětovné klepnutí na už otevřený řádek ji sbalí.
+          onClick={() => {
+            if (has) setOpen(selectedId === loc.id && open ? false : true);
+          }}
           className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
         >
           <span className={clsx("truncate", loc.archived_at && "text-slate-400 line-through")}>

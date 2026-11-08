@@ -14,11 +14,14 @@ export default function AssistantDrawer({
   onClose,
   examples,
   hint,
+  contextLocationId,
 }: {
   open: boolean;
   onClose: () => void;
   examples: string[];
   hint: string;
+  /** Umístění otevřené na stránce; předvyplní „Jsem tady“ v panelu. */
+  contextLocationId?: string | null;
 }) {
   const { t } = useTranslation();
   return (
@@ -32,7 +35,12 @@ export default function AssistantDrawer({
       }
     >
       <div className="h-full">
-        <AssistantPage embedded examples={examples} hint={hint} />
+        <AssistantPage
+          embedded
+          examples={examples}
+          hint={hint}
+          contextLocationId={contextLocationId}
+        />
       </div>
     </Drawer>
   );

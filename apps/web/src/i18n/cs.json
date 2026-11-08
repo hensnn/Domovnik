@@ -555,6 +555,8 @@
     "add": "Přidat kategorii",
     "addChild": "Podkategorie",
     "addChildShort": "Podkategorie",
+    "showItems": "Zobrazit věci v kategorii",
+    "showItemsOf": "Zobrazit věci v kategorii {{name}}",
     "duplicateTitle": "Duplikovat kategorii „{{name}}“",
     "duplicateChildren": "Zkopírovat i podkategorie",
     "duplicateHint": "Kopíruje se jen struktura kategorií. Věci zůstanou v původní kategorii.",
