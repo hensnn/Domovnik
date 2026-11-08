@@ -7,8 +7,8 @@ import { Link } from "react-router-dom";
 import { api_, useApiMutation, useCategories, useTags } from "../../api/hooks";
 import type { Category } from "../../api/types";
 import { CategorySelect } from "../../components/Pickers";
+import { TagBadge } from "../../components/TagBadge";
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -66,14 +66,17 @@ export default function CategoriesPage() {
       </Card>
 
       <Card className="space-y-2">
-        <h2 className="font-semibold">{t("categories.tags")}</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold">{t("categories.tags")}</h2>
+          <Link to="/tags" className="text-sm text-brand-700 hover:underline dark:text-brand-100">
+            {t("categories.manageTags")}
+          </Link>
+        </div>
         {tags.data?.length ? (
           <div className="flex flex-wrap gap-2">
             {tags.data.map((tg) => (
               <Link key={tg.id} to={`/items?tag=${encodeURIComponent(tg.name)}`}>
-                <Badge>
-                  {tg.name} · {tg.item_count}
-                </Badge>
+                <TagBadge name={`${tg.name} · ${tg.item_count}`} color={tg.color} />
               </Link>
             ))}
           </div>
@@ -143,7 +146,7 @@ function Row({
           <span className="text-xs text-slate-400">{c.item_count}</span>
         </Link>
         {canWrite && (
-          <div className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+          <div className="flex gap-0.5">
             <Button
               size="sm"
               variant="ghost"
@@ -152,6 +155,7 @@ function Row({
               onClick={() => onAdd(c.id)}
             >
               <Plus className="size-4" />
+              <span className="hidden text-xs lg:inline">{t("categories.addChildShort")}</span>
             </Button>
             <Button
               size="sm"

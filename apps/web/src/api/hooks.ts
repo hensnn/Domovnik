@@ -173,6 +173,12 @@ export const api_ = {
     post<Category>(`/categories/${id}/merge`, { target_id: targetId }),
   deleteCategory: (id: string, reassignTo?: string) =>
     del<void>(`/categories/${id}`, { reassign_to: reassignTo }),
+  createTag: (body: { name: string; color?: string | null }) => post<Tag>("/tags", body),
+  /** `color: null` barvu odstraní; neuvedené pole se nemění. */
+  updateTag: (id: string, body: { name?: string; color?: string | null }) =>
+    patch<Tag>(`/tags/${id}`, body),
+  mergeTag: (id: string, targetId: string) =>
+    post<Tag>(`/tags/${id}/merge`, { target_id: targetId }),
   renameTag: (id: string, name: string) => patch<Tag>(`/tags/${id}`, { name }),
   deleteTag: (id: string) => del<void>(`/tags/${id}`),
   putSetting: (key: string, value: unknown, scope: "global" | "user") =>

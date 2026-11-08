@@ -17,8 +17,10 @@ from domovnik.schemas import (
     LocationCreate,
     LocationOut,
     LocationUpdate,
+    TagCreate,
+    TagMerge,
     TagOut,
-    TagRename,
+    TagUpdate,
 )
 from domovnik.services import categories as category_service
 from domovnik.services import locations as location_service
@@ -154,11 +156,38 @@ def list_tags(rc: RequestCtx = Depends(deps.read)) -> list[TagOut]:
     return tag_service.list_tags(rc.db)
 
 
-@router.patch("/tags/{tag_id}", response_model=TagOut)
-def rename_tag(tag_id: uuid.UUID, body: TagRename, rc: RequestCtx = Depends(deps.write)) -> TagOut:
-    tag = tag_service.rename_tag(rc.db, rc.ctx, tag_id, body.name)
+def _tag_out(rc: RequestCtx, tag_id: uuid.UUID) -> TagOut:
+    return next(t for t in tag_service.list_tags(rc.db) if t.id == tag_id)
+
+
+@router.post("/tags", response_model=TagOut, status_code=201)
+def create_tag(body: TagCreate, rc: RequestCtx = Depends(deps.write)) -> TagOut:
+    tag = tag_service.create_tag(rc.db, rc.ctx, body.name, body.color)
     rc.commit()
-    return next(t for t in tag_service.list_tags(rc.db) if t.id == tag.id)
+    return _tag_out(rc, tag.id)
+
+
+@router.patch("/tags/{tag_id}", response_model=TagOut)
+def update_tag(tag_id: uuid.UUID, body: TagUpdate, rc: RequestCtx = Depends(deps.write)) -> TagOut:
+    """Přejmenuje tag a / nebo změní barvu (`color: null` ji odstraní)."""
+    tag = tag_service.update_tag(
+        rc.db,
+        rc.ctx,
+        tag_id,
+        name=body.name,
+        color=body.color,
+        set_color="color" in body.model_fields_set,
+    )
+    rc.commit()
+    return _tag_out(rc, tag.id)
+
+
+@router.post("/tags/{tag_id}/merge", response_model=TagOut)
+def merge_tag(tag_id: uuid.UUID, body: TagMerge, rc: RequestCtx = Depends(deps.write)) -> TagOut:
+    """Sloučí tag do cílového: věci dostanou cílový tag, zdrojový se smaže."""
+    target = tag_service.merge_tags(rc.db, rc.ctx, tag_id, body.target_id)
+    rc.commit()
+    return _tag_out(rc, target.id)
 
 
 @router.delete("/tags/{tag_id}", status_code=204)

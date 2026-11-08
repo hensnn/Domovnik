@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -360,8 +360,23 @@ class CategoryMerge(BaseModel):
     target_id: uuid.UUID
 
 
-class TagRename(BaseModel):
+HexColor = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
+
+
+class TagCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    color: HexColor | None = None
+
+
+class TagUpdate(BaseModel):
+    """Změna tagu; neuvedené pole se nemění, `color: null` barvu odstraní."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    color: HexColor | None = None
+
+
+class TagMerge(BaseModel):
+    target_id: uuid.UUID
 
 
 class BulkRequest(BaseModel):

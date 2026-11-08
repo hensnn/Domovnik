@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { api_, useApiMutation, useItem, useItemMovements, useLocations } from "../../api/hooks";
 import type { Item, Placement } from "../../api/types";
 import { LocationSelect } from "../../components/Pickers";
+import { TagBadge } from "../../components/TagBadge";
 import FileGallery from "../files/FileGallery";
 import {
   Badge,
@@ -229,7 +230,7 @@ function Details({ item }: { item: Item }) {
           <h3 className="mb-2 font-semibold">{t("items.tags")}</h3>
           <div className="flex flex-wrap gap-1.5">
             {item.tags.map((tag) => (
-              <Badge key={tag}>{tag}</Badge>
+              <TagBadge key={tag} name={tag} />
             ))}
           </div>
         </section>

@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from domovnik.context import ActorContext
-from domovnik.schemas import CategoryCreate, ItemCreate, LocationCreate, PlacementIn
+from domovnik.schemas import CategoryCreate, ItemCreate, ItemUpdate, LocationCreate, PlacementIn
 from domovnik.services import categories, items, locations, search, stats
 from domovnik.services.search import ItemFilter
 
@@ -247,3 +247,64 @@ def test_extended_item_filters(db: Session, ctx: ActorContext) -> None:
     assert names(by_price)[:2] == ["Vrtačka", "Mléko"]
     by_qty = search.search_items(db, ItemFilter(sort="quantity", descending=True))
     assert names(by_qty)[0] == "Mléko"
+
+
+def test_tag_management_rename_color_merge_delete(db: Session, ctx: ActorContext) -> None:
+    from domovnik.errors import Conflict
+    from domovnik.services import tags as tag_service
+
+    a = items.create_item(db, ctx, ItemCreate(name="Kladivo", tags=["naradi", "dilna"]))
+    b = items.create_item(db, ctx, ItemCreate(name="Pila", tags=["nářadí"]))
+    c = items.create_item(db, ctx, ItemCreate(name="Hrábě", tags=["zahrada"]))
+
+    def tag(name: str) -> Any:
+        return next(t for t in tag_service.list_tags(db) if t.name == name)
+
+    # přejmenování přepíše i fulltext věcí s tagem
+    tag_service.update_tag(db, ctx, tag("zahrada").id, name="Zahrada a dvůr")
+    assert names(search.search_items(db, ItemFilter(q="dvur"))) == ["Hrábě"]
+    assert names(search.search_items(db, ItemFilter(q="zahrada"))) == ["Hrábě"]
+    assert items.get_item_out(db, c.id).tags == ["Zahrada a dvůr"]
+
+    # barva: nastavit, ponechat při přejmenování, odstranit
+    t = tag_service.update_tag(db, ctx, tag("dilna").id, color="#ff8800", set_color=True)
+    assert t.color == "#ff8800"
+    tag_service.update_tag(db, ctx, t.id, name="Dílna")
+    assert tag("Dílna").color == "#ff8800"
+    tag_service.update_tag(db, ctx, t.id, color=None, set_color=True)
+    assert tag("Dílna").color is None
+
+    # přejmenování na existující název (i jiná velikost písmen) je konflikt
+    try:
+        tag_service.update_tag(db, ctx, tag("naradi").id, name="NÁŘADÍ".lower())
+    except Conflict:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("očekáván konflikt")
+    # změna jen velikosti písmen téhož tagu projde
+    tag_service.update_tag(db, ctx, tag("naradi").id, name="Naradi")
+
+    # sloučení: věci přejdou na cílový tag, zdrojový zmizí, duplicity se nezdvojí
+    items.update_item(db, ctx, b.id, ItemUpdate(tags=["nářadí", "Naradi"]))
+    target = tag_service.merge_tags(db, ctx, tag("Naradi").id, tag("nářadí").id)
+    assert target.name == "nářadí"
+    assert items.get_item_out(db, a.id).tags == ["Dílna", "nářadí"]
+    assert items.get_item_out(db, b.id).tags == ["nářadí"]
+    assert tag("nářadí").item_count == 2
+    assert all(t.name != "Naradi" for t in tag_service.list_tags(db))
+    assert sorted(names(search.search_items(db, ItemFilter(tags=["nářadí"])))) == [
+        "Kladivo",
+        "Pila",
+    ]
+    try:
+        tag_service.merge_tags(db, ctx, target.id, target.id)
+    except Exception as exc:
+        assert "sám se sebou" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("sloučení se sebou nesmí projít")
+
+    # vytvoření bez věcí a smazání
+    new = tag_service.create_tag(db, ctx, "  Zimní   výbava ", "#3366cc")
+    assert new.name == "Zimní výbava" and tag("Zimní výbava").item_count == 0
+    tag_service.delete_tag(db, ctx, new.id)
+    assert all(t.name != "Zimní výbava" for t in tag_service.list_tags(db))

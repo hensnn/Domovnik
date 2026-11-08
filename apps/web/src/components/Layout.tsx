@@ -12,6 +12,7 @@ import {
   Search,
   Settings as SettingsIcon,
   Sparkles,
+  Tag,
   Tags,
 } from "lucide-react";
 import { useState } from "react";
@@ -32,13 +33,14 @@ const NAV = [
   { to: "/assistant", key: "nav.assistant", icon: Sparkles },
   { to: "/locations", key: "nav.locations", icon: FolderTree },
   { to: "/categories", key: "nav.categories", icon: Tags },
+  { to: "/tags", key: "nav.tags", icon: Tag },
   { to: "/settings", key: "nav.settings", icon: SettingsIcon },
 ] as const;
 
 /** Spodní navigace na mobilu: hlavní cíle + „Přidat“ uprostřed; zbytek schovává „Více“. */
 const MOBILE_MAIN = [NAV[0], NAV[1]] as const;
 const MOBILE_AFTER = [NAV[2]] as const;
-const MOBILE_MORE = [NAV[3], NAV[4], NAV[5]] as const;
+const MOBILE_MORE = [NAV[3], NAV[4], NAV[5], NAV[6]] as const;
 /** Další položky jen v postranním menu na desktopu (na mobilu: tlačítko Skenovat v hlavičce a přehled). */
 const EXTRA_NAV = [
   { to: "/scan", key: "scan.nav", icon: ScanLine },

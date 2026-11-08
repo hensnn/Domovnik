@@ -27,6 +27,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api_, useApiMutation, useItem, useItems, useSettings } from "../../api/hooks";
 import type { Item, ItemFilters, ItemStatus, LocationKind } from "../../api/types";
 import { CategorySelect, LocationSelect, TagInput } from "../../components/Pickers";
+import { TagBadge } from "../../components/TagBadge";
 import { Thumb } from "../../components/Thumb";
 import {
   Badge,
@@ -253,7 +254,7 @@ export default function ItemsPage() {
         cell: ({ row }) => (
           <div className="flex flex-wrap gap-1">
             {row.original.tags.slice(0, 3).map((x) => (
-              <Badge key={x}>{x}</Badge>
+              <TagBadge key={x} name={x} />
             ))}
           </div>
         ),

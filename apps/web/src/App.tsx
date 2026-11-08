@@ -10,6 +10,7 @@ import LocationsPage from "./features/locations/LocationsPage";
 import AddFromPhotoPage from "./features/photos/AddFromPhotoPage";
 import ScanPage from "./features/scan/ScanPage";
 import SettingsPage from "./features/settings/SettingsPage";
+import TagsPage from "./features/tags/TagsPage";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="assistant" element={<AssistantPage />} />
         <Route path="add-photo" element={<AddFromPhotoPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="tags" element={<TagsPage />} />
         <Route path="scan" element={<ScanPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:id" element={<InventoryPage />} />

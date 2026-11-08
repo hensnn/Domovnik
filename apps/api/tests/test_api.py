@@ -234,6 +234,26 @@ def test_bulk_stats_search_and_settings(client: TestClient) -> None:
     assert listed["total"] == len(listed["items"])
     assert client.get("/api/v1/items", params={"sort": "price"}).status_code == 200
 
+    # správa tagů přes HTTP: vytvoření, barva, přejmenování, konflikt, sloučení, smazání
+    t1 = ok(client.post("/api/v1/tags", json={"name": "Zima", "color": "#112233"}), 201)
+    t2 = ok(client.post("/api/v1/tags", json={"name": "Léto"}), 201)
+    assert t1["color"] == "#112233" and t1["item_count"] == 0
+    assert client.post("/api/v1/tags", json={"name": "zima"}).status_code == 409
+    assert client.post("/api/v1/tags", json={"name": "X", "color": "červená"}).status_code == 422
+    only_color = ok(client.patch(f"/api/v1/tags/{t2['id']}", json={"color": "#abcdef"}))
+    assert only_color["name"] == "Léto" and only_color["color"] == "#abcdef"
+    cleared = ok(client.patch(f"/api/v1/tags/{t2['id']}", json={"color": None}))
+    assert cleared["color"] is None and cleared["name"] == "Léto"
+    assert client.patch(f"/api/v1/tags/{t2['id']}", json={"name": "ZIMA"}).status_code == 409
+    merged = ok(client.post(f"/api/v1/tags/{t2['id']}/merge", json={"target_id": t1["id"]}))
+    assert merged["id"] == t1["id"]
+    assert t2["id"] not in [t["id"] for t in ok(client.get("/api/v1/tags"))]
+    assert (
+        client.post(f"/api/v1/tags/{t1['id']}/merge", json={"target_id": t1["id"]}).status_code
+        == 422
+    )
+    ok(client.delete(f"/api/v1/tags/{t1['id']}"), 204)
+
     settings = {x["key"]: x for x in ok(client.get("/api/v1/settings"))}
     assert settings["ui.theme"]["value"] == "auto" and settings["ui.theme"]["is_default"]
     ok(client.put("/api/v1/settings/ui.theme", json={"value": "dark"}), 204)
