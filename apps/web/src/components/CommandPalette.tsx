@@ -1,4 +1,4 @@
-import { FolderTree, Package, Tag } from "lucide-react";
+import { FolderTree, Package, Sparkles, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +59,22 @@ export default function CommandPalette({
   const data = results.data;
   const hasQuery = q.trim().length > 0 || kinds.length > 0;
   const empty = data && !data.items.length && !data.locations.length && !data.categories.length;
+  const ask = () => go(`/assistant?prompt=${encodeURIComponent(q.trim())}`);
+  // Enter: delší věta (nebo žádný nález) jde asistentovi, krátké hledání otevře první nález.
+  const onEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing || !q.trim()) return;
+    e.preventDefault();
+    const words = q.trim().split(/\s+/).length;
+    const first = data?.items[0]
+      ? `/items/${data.items[0].id}`
+      : data?.locations[0]
+        ? `/locations/${data.locations[0].id}`
+        : data?.categories[0]
+          ? `/items?category_id=${data.categories[0].id}`
+          : null;
+    if (words >= 4 || !first) ask();
+    else go(first);
+  };
   const more = (key: "items" | "locations" | "categories", shown: number) => {
     const total = data?.totals?.[key] ?? 0;
     return scope === "all" && total > shown ? (
@@ -89,6 +105,9 @@ export default function CommandPalette({
             placeholder={t("search.placeholder")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={onEnter}
+            lang="cs"
+            enterKeyHint="go"
           />
           <div className="flex flex-wrap gap-1" role="group" aria-label={t("search.scopeLabel")}>
             {SCOPES.map((s) => (
@@ -111,6 +130,12 @@ export default function CommandPalette({
           </div>
         </div>
         <div className="max-h-[55dvh] overflow-y-auto p-2">
+          {q.trim() && (
+            <Row icon={<Sparkles className="size-4" />} onClick={ask}>
+              <span className="font-medium">{t("search.askAssistant", { q: q.trim() })}</span>
+              <span className="text-xs text-slate-500">{t("search.askAssistantHint")}</span>
+            </Row>
+          )}
           {results.isFetching && !data && <Spinner />}
           {!hasQuery && (
             <p className="p-4 text-center text-sm text-slate-500">{t("search.hint")}</p>

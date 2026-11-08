@@ -82,7 +82,7 @@ describe("AssistantPage", () => {
     await screen.findByText("Starší dotaz");
     await screen.findByRole("option", { name: "Garáž" });
     fireEvent.change(screen.getByLabelText("Jsem tady:"), { target: { value: "loc1" } });
-    fireEvent.change(screen.getByLabelText("Napiš zprávu…"), {
+    fireEvent.change(screen.getByLabelText("Napiš nebo nadiktuj zprávu…"), {
       target: { value: "Přesuň kladivo do garáže" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Odeslat" }));
@@ -99,7 +99,9 @@ describe("AssistantPage", () => {
     });
     expect(localStorage.getItem("domovnik.currentLocation")).toBe("loc1");
     // další zpráva pokračuje ve stejné konverzaci
-    fireEvent.change(screen.getByLabelText("Napiš zprávu…"), { target: { value: "díky" } });
+    fireEvent.change(screen.getByLabelText("Napiš nebo nadiktuj zprávu…"), {
+      target: { value: "díky" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Odeslat" }));
     await waitFor(() => expect(calls.filter((c) => c.path === "/ai/chat")).toHaveLength(2));
     expect(
@@ -108,10 +110,76 @@ describe("AssistantPage", () => {
     ).toBe("c1");
   });
 
+  it("text z odkazu ?prompt= se hned odešle asistentovi (jen jednou)", async () => {
+    const { calls } = mockFetch([
+      ...baseRoutes(),
+      [
+        /^POST \/ai\/chat$/,
+        () =>
+          sseResponse([
+            ["conversation", { conversation_id: "c9" }],
+            ["message", { text: "Hotovo." }],
+            ["done", { conversation_id: "c9", reply: "Hotovo." }],
+          ]),
+      ],
+    ]);
+    renderWithProviders(
+      <AssistantPage />,
+      "/assistant?prompt=" + encodeURIComponent("přidej do garáže tři baterie"),
+    );
+    expect(await screen.findByText("Hotovo.")).toBeInTheDocument();
+    const chats = calls.filter((c) => c.path === "/ai/chat");
+    expect(chats).toHaveLength(1);
+    expect((chats[0].body as { text: string }).text).toBe("přidej do garáže tři baterie");
+    expect(screen.getByText("přidej do garáže tři baterie")).toBeInTheDocument();
+  });
+
+  it("rozepsaný text se ukládá jako koncept a po návratu je zpět", async () => {
+    mockFetch(baseRoutes());
+    const first = renderWithProviders(<AssistantPage />);
+    fireEvent.change(await screen.findByLabelText("Napiš nebo nadiktuj zprávu…"), {
+      target: { value: "tři baterie a páska" },
+    });
+    first.unmount();
+    renderWithProviders(<AssistantPage />);
+    expect(await screen.findByLabelText("Napiš nebo nadiktuj zprávu…")).toHaveValue(
+      "tři baterie a páska",
+    );
+  });
+
+  it("na dotykovém zařízení je Enter nový řádek, na počítači odesílá", async () => {
+    const { calls } = mockFetch([
+      ...baseRoutes(),
+      [/^POST \/ai\/chat$/, () => sseResponse([["done", { conversation_id: "c2", reply: "ok" }]])],
+    ]);
+    const original = window.matchMedia;
+    // dotyk: Enter neodesílá
+    window.matchMedia = ((q: string) => ({ matches: q.includes("coarse") })) as never;
+    const touch = renderWithProviders(<AssistantPage />);
+    const box = await screen.findByLabelText("Napiš nebo nadiktuj zprávu…");
+    fireEvent.change(box, { target: { value: "tři baterie" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(calls.filter((c) => c.path === "/ai/chat")).toHaveLength(0);
+    touch.unmount();
+
+    // počítač: Enter odešle
+    window.matchMedia = (() => ({ matches: false })) as never;
+    try {
+      renderWithProviders(<AssistantPage />);
+      const box2 = await screen.findByLabelText("Napiš nebo nadiktuj zprávu…");
+      fireEvent.keyDown(box2, { key: "Enter" });
+      await waitFor(() => expect(calls.filter((c) => c.path === "/ai/chat")).toHaveLength(1));
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("503 z API zobrazí srozumitelnou chybu", async () => {
     mockFetch([...baseRoutes(), [/^POST \/ai\/chat$/, () => problem(503, "Chybí API klíč.")]]);
     renderWithProviders(<AssistantPage />);
-    fireEvent.change(await screen.findByLabelText("Napiš zprávu…"), { target: { value: "ahoj" } });
+    fireEvent.change(await screen.findByLabelText("Napiš nebo nadiktuj zprávu…"), {
+      target: { value: "ahoj" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Odeslat" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Asistent teď není dostupný.");
@@ -124,7 +192,9 @@ describe("AssistantPage", () => {
       [/^POST \/ai\/chat$/, () => problem(429, "Dnešní limit vyčerpán.")],
     ]);
     renderWithProviders(<AssistantPage />);
-    fireEvent.change(await screen.findByLabelText("Napiš zprávu…"), { target: { value: "ahoj" } });
+    fireEvent.change(await screen.findByLabelText("Napiš nebo nadiktuj zprávu…"), {
+      target: { value: "ahoj" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Odeslat" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Dnešní limit vyčerpán.");
   });

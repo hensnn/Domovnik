@@ -20,7 +20,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
 import { api_, useAiStatus, useApiMutation, useConversations, useSettings } from "../../api/hooks";
@@ -38,6 +38,7 @@ import {
 } from "../../components/ui";
 import { formatDateTime } from "../../lib/format";
 import { useCurrentLocation } from "../../lib/currentLocation";
+import { useStoredState } from "../../lib/storage";
 import { useAuth } from "../auth/AuthProvider";
 import ChangeSetCard from "./ChangeSetCard";
 import {
@@ -103,7 +104,10 @@ export default function AssistantPage() {
 
   const [convId, setConvId] = useState<string | null>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
-  const [text, setText] = useState("");
+  // Rozepsaný text přežije přepnutí na jinou stránku (nadiktovaný seznam se neztratí).
+  const [text, setText] = useStoredState("assistant.draft", "");
+  const [params, setParams] = useSearchParams();
+  const initialPrompt = useRef(params.get("prompt"));
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -236,6 +240,16 @@ export default function AssistantPage() {
     ],
   );
 
+  // Odkaz z rychlého hledání (`/assistant?prompt=…`): text se rovnou odešle asistentovi.
+  useEffect(() => {
+    const prompt = initialPrompt.current;
+    if (!prompt) return;
+    initialPrompt.current = null;
+    setParams({}, { replace: true });
+    void send(prompt, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const mic = useSpeechRecognition(
     (finalText) => void send(finalText, true),
     (code) => {
@@ -283,7 +297,10 @@ export default function AssistantPage() {
     },
   });
 
+  // Na telefonu (dotyk) je Enter nový řádek – seznam věcí se píše / diktuje po řádcích, odesílá tlačítko.
+  const touch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (touch) return;
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       void send(text, false);
@@ -393,8 +410,9 @@ export default function AssistantPage() {
                 {t("assistant.welcome")}
               </p>
               <p>{t("assistant.welcomeHint")}</p>
+              <p>{t("assistant.dictationHint")}</p>
               <div className="flex flex-wrap justify-center gap-2 pt-1">
-                {(["ex1", "ex2", "ex3"] as const).map((k) => (
+                {(["ex1", "ex2", "ex3", "ex4"] as const).map((k) => (
                   <button
                     key={k}
                     onClick={() => setText(t(`assistant.${k}`))}
@@ -442,8 +460,13 @@ export default function AssistantPage() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKey}
-              rows={2}
+              rows={touch ? 3 : 2}
               maxLength={4000}
+              lang="cs"
+              autoFocus
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              enterKeyHint={touch ? "enter" : "send"}
               placeholder={t("assistant.placeholder")}
               aria-label={t("assistant.placeholder")}
               disabled={busy}
