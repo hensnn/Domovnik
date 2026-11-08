@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { AlertTriangle, Check, GitMerge, Pencil, Plus, Undo2, X } from "lucide-react";
+import { AlertTriangle, Check, GitMerge, Maximize2, Pencil, Plus, Undo2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -28,6 +28,8 @@ import {
   summarize,
 } from "../../lib/photos";
 
+import PhotoViewer from "./PhotoViewer";
+
 const NEW_CATEGORY = "__new__";
 
 export default function ReviewScreen({
@@ -51,6 +53,7 @@ export default function ReviewScreen({
   );
   const [overrides, setOverrides] = useState<Record<string, DetectionOverrides>>({});
   const [active, setActive] = useState<string | null>(null);
+  const [viewer, setViewer] = useState(false);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const sum = summarize(choices);
@@ -101,6 +104,7 @@ export default function ReviewScreen({
             choices={choices}
             active={active}
             onSelect={(id) => select(id, true)}
+            onEnlarge={() => setViewer(true)}
           />
           {analysis.scene && (
             <p className="mt-1 text-xs text-slate-500">
@@ -147,6 +151,18 @@ export default function ReviewScreen({
         </div>
       </div>
 
+      {viewer && (
+        <PhotoViewer
+          src={`/api/v1/files/${analysis.file_id}`}
+          detections={dets}
+          choices={choices}
+          active={active}
+          onSelect={(id) => select(id, true)}
+          onChoice={(id, c) => setChoices((all) => ({ ...all, [id]: c }))}
+          onClose={() => setViewer(false)}
+        />
+      )}
+
       <div className="sticky bottom-0 -mx-3 mt-4 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur md:-mx-5 md:px-5 dark:border-slate-800 dark:bg-slate-900/95">
         {error && (
           <p role="alert" className="mb-2 text-sm text-red-600">
@@ -186,12 +202,14 @@ function PhotoWithBoxes({
   choices,
   active,
   onSelect,
+  onEnlarge,
 }: {
   fileId: string;
   detections: Detection[];
   choices: Record<string, Choice>;
   active: string | null;
   onSelect: (id: string) => void;
+  onEnlarge: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -199,8 +217,18 @@ function PhotoWithBoxes({
       <img
         src={thumbUrl(fileId, 1024)}
         alt={t("photos.photoAlt")}
-        className="block max-h-[30dvh] w-auto max-w-full md:max-h-[72dvh]"
+        onClick={onEnlarge}
+        className="block max-h-[30dvh] w-auto max-w-full cursor-zoom-in md:max-h-[72dvh]"
       />
+      <button
+        type="button"
+        onClick={onEnlarge}
+        aria-label={t("photos.viewer.enlarge")}
+        title={t("photos.viewer.enlarge")}
+        className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1 rounded-lg bg-slate-900/75 px-2 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+      >
+        <Maximize2 className="size-4" /> {t("photos.viewer.enlargeShort")}
+      </button>
       {detections.map((d, i) => {
         if (!d.bbox) return null;
         const [x, y, w, h] = d.bbox;
