@@ -34,6 +34,8 @@ ufw allow 8080/tcp
 ufw --force enable
 
 mkdir -p "$DATA_DIR/pgdata" "$DATA_DIR/files" "$DATA_DIR/backups"
+# API běží pod uživatelem s UID 10001 (viz apps/api/Dockerfile) a musí umět zapisovat fotky
+chown -R 10001:10001 "$DATA_DIR/files"
 
 # Kód aplikace
 if [ ! -d "$APP_DIR/.git" ]; then

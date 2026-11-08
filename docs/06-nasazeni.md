@@ -72,3 +72,4 @@ HTTPS všude, cookie `Secure`+`HttpOnly`+`SameSite=Lax`, CSRF hlavička, API bě
 - **Chat se „zasekne“** – za NPM chybí `proxy_buffering off` / WebSockets.
 - **Docker v LXC nejde spustit** – kontejner musí mít `nesting=1,keyctl=1` a být po změně restartován.
 - **API nenastartuje** – `docker compose … logs api` (typicky chybějící `SECRET_KEY`/`POSTGRES_PASSWORD`).
+- **Nahrání fotky vrací chybu 500 (`PermissionError: /data/files/…`)** – složka s fotkami musí patřit uživateli API (UID 10001): `chown -R 10001:10001 /data/files` (uvnitř LXC). Nové instalace to řeší `bootstrap.sh`.
