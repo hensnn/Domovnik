@@ -28,3 +28,6 @@ Thumbs.db
 # Pracovní worktree agentů Claude Code
 .claude/worktrees/
 !deploy/.env.prod.example
+
+# Kořenový certifikát interní CA (vyexportuje deploy/proxmox/vpn-https.sh)
+certs/

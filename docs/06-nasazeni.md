@@ -24,6 +24,13 @@ docker compose -f deploy/compose.prod.yml --env-file deploy/.env cp web:/data/ca
 ```
 Android: *Nastavení → Zabezpečení → Šifrování a přihlašovací údaje → Instalovat certifikát → CA certifikát*. Název `DOMOVNIK_HOST` musí být dostupný z telefonu (DNS v routeru / Pi-hole / záznam ve VPN).
 
+**A2) Přístup odkudkoliv přes VPN (WireGuard), bez domény a bez vystavení do internetu.** Uvnitř LXC jako root:
+```bash
+cd /opt/domovnik && git pull --ff-only
+./deploy/proxmox/vpn-https.sh 192.168.0.15 --serve
+```
+Skript nastaví `DOMOVNIK_HOST` na zadanou IP (nebo jméno), restartuje Caddy, vyexportuje kořenový certifikát do `/opt/domovnik/certs/domovnik-root.crt`, ověří HTTPS a vypíše otisk i postup instalace pro Android, iPhone, Windows a Linux. S `--serve` je navíc 5 minut ke stažení na `http://<IP>:8099/domovnik-root.crt` (jen přes VPN; port se po skončení zavře). V profilu WireGuardu na telefonu musí být v `AllowedIPs` domácí síť (např. `192.168.0.0/24`). Certifikát stačí nainstalovat jednou na každé zařízení.
+
 **B) Později – Nginx Proxy Manager + Let's Encrypt.** V `deploy/.env` nastav `CADDYFILE=/etc/caddy/Caddyfile.http`, `HTTP_PORT=8081`, `HTTPS_PORT=8444` (aby nekolidovaly) a v NPM vytvoř Proxy Host na `http://<IP-LXC>:8080` s certifikátem (ideálně DNS-01, protože aplikace není vystavená do internetu). V NPM zapni **WebSockets**, v *Advanced* přidej:
 ```
 proxy_buffering off;
